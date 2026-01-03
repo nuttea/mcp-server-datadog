@@ -2,6 +2,8 @@ import { ExtendedTool, ToolHandlers } from '../../utils/types'
 import { v2 } from '@datadog/datadog-api-client'
 import { createToolSchema } from '../../utils/tool'
 import { ListTracesZodSchema } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type TracesToolName = 'list_traces'
 type TracesTool = ExtendedTool<TracesToolName>
@@ -29,28 +31,34 @@ export const createTracesToolHandlers = (
         sort = '-timestamp',
         service,
         operation,
-      } = ListTracesZodSchema.parse(request.params.arguments)
+      } = parseWithWarnings(
+        ListTracesZodSchema,
+        request.params.arguments,
+        'list_traces',
+      )
 
-      const response = await apiInstance.listSpans({
-        body: {
-          data: {
-            attributes: {
-              filter: {
-                query: [
-                  query,
-                  ...(service ? [`service:${service}`] : []),
-                  ...(operation ? [`operation:${operation}`] : []),
-                ].join(' '),
-                from: new Date(from * 1000).toISOString(),
-                to: new Date(to * 1000).toISOString(),
+      const response = await withRetry(() =>
+        apiInstance.listSpans({
+          body: {
+            data: {
+              attributes: {
+                filter: {
+                  query: [
+                    query,
+                    ...(service ? [`service:${service}`] : []),
+                    ...(operation ? [`operation:${operation}`] : []),
+                  ].join(' '),
+                  from: new Date(from * 1000).toISOString(),
+                  to: new Date(to * 1000).toISOString(),
+                },
+                sort: sort as 'timestamp' | '-timestamp',
+                page: { limit },
               },
-              sort: sort as 'timestamp' | '-timestamp',
-              page: { limit },
+              type: 'search_request',
             },
-            type: 'search_request',
           },
-        },
-      })
+        }),
+      )
 
       if (!response.data) {
         throw new Error('No traces data returned')

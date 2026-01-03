@@ -6,6 +6,8 @@ import {
   ScheduleDowntimeZodSchema,
   CancelDowntimeZodSchema,
 } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type DowntimesToolName =
   | 'list_downtimes'
@@ -38,13 +40,17 @@ export const createDowntimesToolHandlers = (
 ): DowntimesToolHandlers => {
   return {
     list_downtimes: async (request) => {
-      const { currentOnly } = ListDowntimesZodSchema.parse(
+      const { currentOnly } = parseWithWarnings(
+        ListDowntimesZodSchema,
         request.params.arguments,
+        'list_downtimes',
       )
 
-      const res = await apiInstance.listDowntimes({
-        currentOnly,
-      })
+      const res = await withRetry(() =>
+        apiInstance.listDowntimes({
+          currentOnly,
+        }),
+      )
 
       return {
         content: [
@@ -57,7 +63,11 @@ export const createDowntimesToolHandlers = (
     },
 
     schedule_downtime: async (request) => {
-      const params = ScheduleDowntimeZodSchema.parse(request.params.arguments)
+      const params = parseWithWarnings(
+        ScheduleDowntimeZodSchema,
+        request.params.arguments,
+        'schedule_downtime',
+      )
 
       // Convert to the format expected by Datadog client
       const downtimeData: v1.Downtime = {
@@ -79,9 +89,11 @@ export const createDowntimesToolHandlers = (
         }
       }
 
-      const res = await apiInstance.createDowntime({
-        body: downtimeData,
-      })
+      const res = await withRetry(() =>
+        apiInstance.createDowntime({
+          body: downtimeData,
+        }),
+      )
 
       return {
         content: [
@@ -94,13 +106,17 @@ export const createDowntimesToolHandlers = (
     },
 
     cancel_downtime: async (request) => {
-      const { downtimeId } = CancelDowntimeZodSchema.parse(
+      const { downtimeId } = parseWithWarnings(
+        CancelDowntimeZodSchema,
         request.params.arguments,
+        'cancel_downtime',
       )
 
-      await apiInstance.cancelDowntime({
-        downtimeId,
-      })
+      await withRetry(() =>
+        apiInstance.cancelDowntime({
+          downtimeId,
+        }),
+      )
 
       return {
         content: [

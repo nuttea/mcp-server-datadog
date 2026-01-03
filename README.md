@@ -4,7 +4,7 @@
 
 ![NPM Version](https://img.shields.io/npm/v/%40winor30%2Fmcp-server-datadog)![Build and Test](https://github.com/winor30/mcp-server-datadog/actions/workflows/ci.yml/badge.svg)[![codecov](https://codecov.io/gh/winor30/mcp-server-datadog/graph/badge.svg?token=BG4ZB74X92)](https://codecov.io/gh/winor30/mcp-server-datadog)[![smithery badge](https://smithery.ai/badge/@winor30/mcp-server-datadog)](https://smithery.ai/server/@winor30/mcp-server-datadog)
 
-MCP server for the Datadog API, enabling incident management and more.
+MCP server for the Datadog API with 32 tools for comprehensive observability, SLI/SLO analysis, account health checks, and automated reporting via Datadog Notebooks.
 
 <a href="https://glama.ai/mcp/servers/bu8gtzkwfr">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/bu8gtzkwfr/badge" alt="mcp-server-datadog MCP server" />
@@ -12,8 +12,17 @@ MCP server for the Datadog API, enabling incident management and more.
 
 ## Features
 
-- **Observability Tools**: Provides a mechanism to leverage key Datadog monitoring features, such as incidents, monitors, logs, dashboards, and metrics, through the MCP server.
-- **Extensible Design**: Designed to easily integrate with additional Datadog APIs, allowing for seamless future feature expansion.
+- **Comprehensive Observability**: 32 tools covering incidents, monitors, logs, dashboards, metrics, traces, hosts, downtimes, RUM, SLOs, APM statistics, and Notebooks.
+- **Datadog Notebooks**: Create, update, and manage Datadog Notebooks programmatically - perfect for automated reporting and documentation.
+- **SLI/SLO Analysis**: Powerful tools for defining Service Level Indicators and monitoring Service Level Objectives with real-time APM statistics.
+- **APM Performance Metrics**: Get request rates, error rates, and latency percentiles (p50, p75, p95, p99) for services and endpoints.
+- **Service Discovery**: Automatically discover API endpoints with HTTP methods, request counts, and performance statistics.
+- **Report Templates**: Reusable templates for generating consistent Datadog maturity assessments.
+- **Input Validation**: Comprehensive validation with configurable limits - lenient mode logs warnings without blocking.
+- **Automatic Retry Logic**: Built-in retry with exponential backoff for transient failures (rate limits, server errors).
+- **Smart Defaults**: Auto-fills time ranges (last 1 hour) when not provided for seamless AI agent integration.
+- **Security**: Environment-based credentials, Dependabot integration, comprehensive security policy (see [SECURITY.md](SECURITY.md)).
+- **Extensible Design**: Clean modular architecture makes it easy to add new Datadog APIs.
 
 ## Tools
 
@@ -203,17 +212,136 @@ MCP server for the Datadog API, enabling incident management and more.
       - `sessionId` (string): Session ID to filter events.
     - **Returns**: Waterfall data for the specified application and session.
 
+21. `list_slos`
+
+    - List Service Level Objectives (SLOs) from Datadog.
+    - **Inputs**:
+      - `tags` (optional array): Filter SLOs by tags.
+      - `query` (optional string): Search query for SLO names.
+      - `limit` (optional number): Maximum number of SLOs to return (default: 100).
+    - **Returns**: List of SLOs with current status, thresholds, and metadata.
+
+22. `get_slo`
+
+    - Get detailed information about a specific SLO.
+    - **Inputs**:
+      - `sloId` (string): SLO ID to fetch.
+      - `withConfiguredAlertIds` (optional boolean): Include configured alert IDs.
+    - **Returns**: Detailed SLO information including status, error budget remaining, and configuration.
+
+23. `get_slo_history`
+
+    - Get SLO history and performance over time.
+    - **Inputs**:
+      - `sloId` (string): SLO ID to fetch history for.
+      - `from` (number): Start time in epoch seconds.
+      - `to` (number): End time in epoch seconds.
+      - `target` (optional number): Target threshold (0-100).
+    - **Returns**: Historical SLO performance data with time series.
+
+24. `get_service_stats_realtime`
+
+    - Get real-time APM service statistics for SLI definition.
+    - **Inputs**:
+      - `service` (string): Service name.
+      - `from` (number): Start time in epoch seconds (defaults to 1 hour ago).
+      - `to` (number): End time in epoch seconds (defaults to now).
+      - `env` (optional string): Environment filter (e.g., production, staging).
+    - **Returns**: Comprehensive statistics including:
+      - Request rate (requests/second)
+      - Error rate (errors/second and percentage)
+      - Latency percentiles (avg, p50, p75, p95, p99, max) in milliseconds
+
+25. `get_service_stats_aggregated`
+
+    - Get aggregated APM service statistics using pre-aggregated metrics (faster).
+    - **Inputs**:
+      - `service` (string): Service name.
+      - `from` (number): Start time in epoch seconds.
+      - `to` (number): End time in epoch seconds.
+      - `env` (optional string): Environment filter.
+    - **Returns**: Time series data for request rate, error rate, and average latency.
+
+26. `get_service_endpoints`
+
+    - Discover service API endpoints with HTTP methods and request statistics.
+    - **Inputs**:
+      - `service` (string): Service name.
+      - `from` (number): Start time in epoch seconds.
+      - `to` (number): End time in epoch seconds.
+      - `env` (optional string): Environment filter.
+      - `limit` (optional number): Maximum endpoints to return (default: 100).
+    - **Returns**: List of endpoints with HTTP method, path, request count, error rate, and latency stats.
+
+27. `get_operation_stats`
+
+    - Get detailed statistics for a specific operation/endpoint.
+    - **Inputs**:
+      - `service` (string): Service name.
+      - `operation` (string): Operation/resource name (e.g., "GET /api/products").
+      - `from` (number): Start time in epoch seconds.
+      - `to` (number): End time in epoch seconds.
+      - `env` (optional string): Environment filter.
+    - **Returns**: Detailed performance statistics for the specific endpoint including request rate, error rate, and latency percentiles.
+
+28. `create_notebook`
+
+    - Create a new Datadog Notebook from markdown content.
+    - **Inputs**:
+      - `name` (string): Notebook name.
+      - `content` (string): Markdown content for the notebook.
+      - `tags` (optional array): Tags to categorize the notebook (e.g., ["team:sre", "assessment"]).
+      - `time_live_span` (optional string): Default timeframe for widgets (1h, 4h, 1d, 1w, 1mo).
+    - **Returns**: Created notebook with ID and URL.
+
+29. `list_notebooks`
+
+    - List all Datadog Notebooks with optional filtering.
+    - **Inputs**:
+      - `author_handle` (optional string): Filter by author.
+      - `query` (optional string): Search query.
+      - `count` (optional number): Number to return (default: 100, max: 1000).
+      - `sort_field` (optional string): Sort by "name", "created", or "modified_at".
+    - **Returns**: Array of notebooks with metadata.
+
+30. `get_notebook`
+
+    - Get a specific Datadog Notebook by ID.
+    - **Inputs**:
+      - `notebook_id` (number): Notebook ID to retrieve.
+    - **Returns**: Full notebook content including cells, metadata, and URL.
+
+31. `update_notebook`
+
+    - Update an existing Datadog Notebook.
+    - **Inputs**:
+      - `notebook_id` (number): Notebook ID to update.
+      - `name` (optional string): New name.
+      - `content` (optional string): New markdown content.
+      - `tags` (optional array): Updated tags.
+      - `status` (optional string): "published" or "unpublished".
+    - **Returns**: Updated notebook metadata and URL.
+
+32. `delete_notebook`
+
+    - Delete a Datadog Notebook.
+    - **Inputs**:
+      - `notebook_id` (number): Notebook ID to delete.
+    - **Returns**: Confirmation of deletion.
+
 ## Setup
 
 ### Datadog Credentials
 
 You need valid Datadog API credentials to use this MCP server:
 
-- `DATADOG_API_KEY`: Your Datadog API key
-- `DATADOG_APP_KEY`: Your Datadog Application key
+- `DATADOG_API_KEY`: Your Datadog API key (required)
+- `DATADOG_APP_KEY`: Your Datadog Application key (required)
 - `DATADOG_SITE` (optional): The Datadog site (e.g. `datadoghq.eu`)
 - `DATADOG_SUBDOMAIN` (optional): The Datadog subdomain (e.g. `<your-subdomain>.datadoghq.com`)
-- `DATADOG_STORAGE_TIER` (optional): Logs storage tier for v2 logs searches. Supported values: `indexes`, `online-archives`, or `flex`.
+- `DATADOG_STORAGE_TIER` (optional): Logs storage tier for v2 logs searches. Supported values: `indexes`, `online-archives`, or `flex`
+- `DATADOG_MAX_RETRIES` (optional): Maximum retry attempts for API calls (default: `2`)
+- `DATADOG_RETRY_DELAY_MS` (optional): Initial retry delay in milliseconds (default: `2000`)
 
 Export them in your environment before running the server:
 
@@ -223,6 +351,8 @@ export DATADOG_APP_KEY="your_app_key"
 export DATADOG_SITE="your_datadog_site" # Optional
 export DATADOG_SUBDOMAIN="your_datadog_subdomain" # Optional
 export DATADOG_STORAGE_TIER="flex" # Optional: indexes | online-archives | flex
+export DATADOG_MAX_RETRIES="2" # Optional: default is 2
+export DATADOG_RETRY_DELAY_MS="2000" # Optional: default is 2000ms
 ```
 
 ## Installation

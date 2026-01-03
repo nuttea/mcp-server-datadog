@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Enable version updates for npm (pnpm-compatible)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    # Limit number of open pull requests for version updates
+    open-pull-requests-limit: 5
+    # Assignees for pull requests
+    reviewers:
+      - "winor30"
+    # Labels to add to pull requests
+    labels:
+      - "dependencies"
+      - "automated"
+    # Commit message configuration
+    commit-message:
+      prefix: "build(deps)"
+      include: "scope"
+    # Group development dependencies together
+    groups:
+      development-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"

@@ -8,6 +8,8 @@ import {
   GetRumPagePerformanceZodSchema,
   GetRumPageWaterfallZodSchema,
 } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type RumToolName =
   | 'get_rum_events'
@@ -51,9 +53,13 @@ export const createRumToolHandlers = (
   apiInstance: v2.RUMApi,
 ): RumToolHandlers => ({
   get_rum_applications: async (request) => {
-    GetRumApplicationsZodSchema.parse(request.params.arguments)
+    parseWithWarnings(
+      GetRumApplicationsZodSchema,
+      request.params.arguments,
+      'get_rum_applications',
+    )
 
-    const response = await apiInstance.getRUMApplications()
+    const response = await withRetry(() => apiInstance.getRUMApplications())
 
     if (response.data == null) {
       throw new Error('No RUM applications data returned')
@@ -70,17 +76,21 @@ export const createRumToolHandlers = (
   },
 
   get_rum_events: async (request) => {
-    const { query, from, to, limit } = GetRumEventsZodSchema.parse(
+    const { query, from, to, limit } = parseWithWarnings(
+      GetRumEventsZodSchema,
       request.params.arguments,
+      'get_rum_events',
     )
 
-    const response = await apiInstance.listRUMEvents({
-      filterQuery: query,
-      filterFrom: new Date(from * 1000),
-      filterTo: new Date(to * 1000),
-      sort: 'timestamp',
-      pageLimit: limit,
-    })
+    const response = await withRetry(() =>
+      apiInstance.listRUMEvents({
+        filterQuery: query,
+        filterFrom: new Date(from * 1000),
+        filterTo: new Date(to * 1000),
+        sort: 'timestamp',
+        pageLimit: limit,
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No RUM events data returned')
@@ -97,18 +107,22 @@ export const createRumToolHandlers = (
   },
 
   get_rum_grouped_event_count: async (request) => {
-    const { query, from, to, groupBy } = GetRumGroupedEventCountZodSchema.parse(
+    const { query, from, to, groupBy } = parseWithWarnings(
+      GetRumGroupedEventCountZodSchema,
       request.params.arguments,
+      'get_rum_grouped_event_count',
     )
 
     // For session counts, we need to use a query to count unique sessions
-    const response = await apiInstance.listRUMEvents({
-      filterQuery: query !== '*' ? query : undefined,
-      filterFrom: new Date(from * 1000),
-      filterTo: new Date(to * 1000),
-      sort: 'timestamp',
-      pageLimit: 2000,
-    })
+    const response = await withRetry(() =>
+      apiInstance.listRUMEvents({
+        filterQuery: query !== '*' ? query : undefined,
+        filterFrom: new Date(from * 1000),
+        filterTo: new Date(to * 1000),
+        sort: 'timestamp',
+        pageLimit: 2000,
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No RUM events data returned')
@@ -160,19 +174,24 @@ export const createRumToolHandlers = (
   },
 
   get_rum_page_performance: async (request) => {
-    const { query, from, to, metricNames } =
-      GetRumPagePerformanceZodSchema.parse(request.params.arguments)
+    const { query, from, to, metricNames } = parseWithWarnings(
+      GetRumPagePerformanceZodSchema,
+      request.params.arguments,
+      'get_rum_page_performance',
+    )
 
     // Build a query that focuses on view events with performance metrics
     const viewQuery = query !== '*' ? `@type:view ${query}` : '@type:view'
 
-    const response = await apiInstance.listRUMEvents({
-      filterQuery: viewQuery,
-      filterFrom: new Date(from * 1000),
-      filterTo: new Date(to * 1000),
-      sort: 'timestamp',
-      pageLimit: 2000,
-    })
+    const response = await withRetry(() =>
+      apiInstance.listRUMEvents({
+        filterQuery: viewQuery,
+        filterFrom: new Date(from * 1000),
+        filterTo: new Date(to * 1000),
+        sort: 'timestamp',
+        pageLimit: 2000,
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No RUM events data returned')
@@ -251,15 +270,19 @@ export const createRumToolHandlers = (
   },
 
   get_rum_page_waterfall: async (request) => {
-    const { applicationName, sessionId } = GetRumPageWaterfallZodSchema.parse(
+    const { applicationName, sessionId } = parseWithWarnings(
+      GetRumPageWaterfallZodSchema,
       request.params.arguments,
+      'get_rum_page_waterfall',
     )
 
-    const response = await apiInstance.listRUMEvents({
-      filterQuery: `@application.name:${applicationName} @session.id:${sessionId}`,
-      sort: 'timestamp',
-      pageLimit: 2000,
-    })
+    const response = await withRetry(() =>
+      apiInstance.listRUMEvents({
+        filterQuery: `@application.name:${applicationName} @session.id:${sessionId}`,
+        sort: 'timestamp',
+        pageLimit: 2000,
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No RUM events data returned')

@@ -4,6 +4,8 @@ import { createToolSchema } from '../../utils/tool'
 import { GetMonitorsZodSchema } from './schema'
 import { unreachable } from '../../utils/helper'
 import { UnparsedObject } from '@datadog/datadog-api-client/dist/packages/datadog-api-client-common/util.js'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type MonitorsToolName = 'get_monitors'
 type MonitorsTool = ExtendedTool<MonitorsToolName>
@@ -23,15 +25,19 @@ export const createMonitorsToolHandlers = (
 ): MonitorsToolHandlers => {
   return {
     get_monitors: async (request) => {
-      const { groupStates, name, tags } = GetMonitorsZodSchema.parse(
+      const { groupStates, name, tags } = parseWithWarnings(
+        GetMonitorsZodSchema,
         request.params.arguments,
+        'get_monitors',
       )
 
-      const response = await apiInstance.listMonitors({
-        groupStates: groupStates?.join(','),
-        name,
-        tags: tags?.join(','),
-      })
+      const response = await withRetry(() =>
+        apiInstance.listMonitors({
+          groupStates: groupStates?.join(','),
+          name,
+          tags: tags?.join(','),
+        }),
+      )
 
       if (response == null) {
         throw new Error('No monitors data returned')

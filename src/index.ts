@@ -28,6 +28,9 @@ import { ToolHandlers } from './utils/types'
 import { createDatadogConfig } from './utils/datadog'
 import { createDowntimesToolHandlers, DOWNTIMES_TOOLS } from './tools/downtimes'
 import { createRumToolHandlers, RUM_TOOLS } from './tools/rum'
+import { createSLOToolHandlers, SLO_TOOLS } from './tools/slo'
+import { createAPMToolHandlers, APM_TOOLS } from './tools/apm'
+import { createHandlers as createNotebooksToolHandlers } from './tools/notebooks'
 import { v2, v1 } from '@datadog/datadog-api-client'
 
 const server = new Server(
@@ -50,6 +53,95 @@ server.onerror = (error) => {
  * Handler that retrieves the list of available tools in the mcp-server-datadog.
  * Currently, it provides incident management functionalities by integrating with Datadog's incident APIs.
  */
+// Notebook tool definitions
+const NOTEBOOKS_TOOLS = [
+  {
+    name: 'create_notebook',
+    description: 'Create a new Datadog Notebook from markdown content',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Notebook name' },
+        content: {
+          type: 'string',
+          description: 'Markdown content for the notebook',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags (e.g., ["team:sre", "assessment"])',
+        },
+        time_live_span: {
+          type: 'string',
+          description: 'Default timeframe (1h, 4h, 1d, 1w, 1mo)',
+        },
+      },
+      required: ['name', 'content'],
+    },
+  },
+  {
+    name: 'list_notebooks',
+    description: 'List all Datadog Notebooks with optional filtering',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        author_handle: { type: 'string', description: 'Filter by author' },
+        query: { type: 'string', description: 'Search query' },
+        count: {
+          type: 'number',
+          description: 'Number to return (max 1000)',
+          default: 100,
+        },
+      },
+    },
+  },
+  {
+    name: 'get_notebook',
+    description: 'Get a specific Datadog Notebook by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        notebook_id: { type: 'number', description: 'Notebook ID' },
+      },
+      required: ['notebook_id'],
+    },
+  },
+  {
+    name: 'update_notebook',
+    description: 'Update an existing Datadog Notebook',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        notebook_id: { type: 'number', description: 'Notebook ID to update' },
+        name: { type: 'string', description: 'New name' },
+        content: { type: 'string', description: 'New markdown content' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Updated tags',
+        },
+        status: {
+          type: 'string',
+          enum: ['published', 'unpublished'],
+          description: 'Publication status',
+        },
+      },
+      required: ['notebook_id'],
+    },
+  },
+  {
+    name: 'delete_notebook',
+    description: 'Delete a Datadog Notebook',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        notebook_id: { type: 'number', description: 'Notebook ID to delete' },
+      },
+      required: ['notebook_id'],
+    },
+  },
+]
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
@@ -62,6 +154,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       ...HOSTS_TOOLS,
       ...DOWNTIMES_TOOLS,
       ...RUM_TOOLS,
+      ...SLO_TOOLS,
+      ...APM_TOOLS,
+      ...NOTEBOOKS_TOOLS,
     ],
   }
 })
@@ -87,6 +182,12 @@ const TOOL_HANDLERS: ToolHandlers = {
   ...createHostsToolHandlers(new v1.HostsApi(datadogConfig)),
   ...createDowntimesToolHandlers(new v1.DowntimesApi(datadogConfig)),
   ...createRumToolHandlers(new v2.RUMApi(datadogConfig)),
+  ...createSLOToolHandlers(new v1.ServiceLevelObjectivesApi(datadogConfig)),
+  ...createAPMToolHandlers(
+    new v2.SpansApi(datadogConfig),
+    new v1.MetricsApi(datadogConfig),
+  ),
+  ...createNotebooksToolHandlers(new v1.NotebooksApi(datadogConfig)),
 }
 /**
  * Handler for invoking Datadog-related tools in the mcp-server-datadog.

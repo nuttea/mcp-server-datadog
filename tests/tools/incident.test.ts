@@ -24,8 +24,8 @@ describe('Incident Tool', () => {
   const toolHandlers = createIncidentToolHandlers(apiInstance)
 
   // https://docs.datadoghq.com/api/latest/incidents/#get-a-list-of-incidents
-  describe.concurrent('list_incidents', async () => {
-    it('should list incidents with pagination', async () => {
+  describe.concurrent('incidents - list mode', async () => {
+    it('should list incidents with pagination (no ID provided)', async () => {
       const mockHandler = http.get(incidentsEndpoint, async () => {
         return HttpResponse.json({
           data: [
@@ -88,11 +88,11 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('list_incidents', {
+        const request = createMockToolRequest('incidents', {
           pageSize: 20,
           pageOffset: 10,
         })
-        const response = (await toolHandlers.list_incidents(
+        const response = (await toolHandlers.incidents(
           request,
         )) as unknown as DatadogToolResponse
 
@@ -132,8 +132,8 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('list_incidents', {})
-        const response = (await toolHandlers.list_incidents(
+        const request = createMockToolRequest('incidents', {})
+        const response = (await toolHandlers.incidents(
           request,
         )) as unknown as DatadogToolResponse
 
@@ -163,8 +163,8 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('list_incidents', {})
-        const response = (await toolHandlers.list_incidents(
+        const request = createMockToolRequest('incidents', {})
+        const response = (await toolHandlers.incidents(
           request,
         )) as unknown as DatadogToolResponse
 
@@ -192,8 +192,8 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('list_incidents', {})
-        await expect(toolHandlers.list_incidents(request)).rejects.toThrow(
+        const request = createMockToolRequest('incidents', {})
+        await expect(toolHandlers.incidents(request)).rejects.toThrow(
           'No incidents data returned',
         )
       })()
@@ -212,8 +212,8 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('list_incidents', {})
-        await expect(toolHandlers.list_incidents(request)).rejects.toThrow()
+        const request = createMockToolRequest('incidents', {})
+        await expect(toolHandlers.incidents(request)).rejects.toThrow()
       })()
 
       server.close()
@@ -221,8 +221,8 @@ describe('Incident Tool', () => {
   })
 
   // https://docs.datadoghq.com/api/latest/incidents/#get-incident-details
-  describe.concurrent('get_incident', async () => {
-    it('should get a specific incident', async () => {
+  describe.concurrent('incidents - get mode', async () => {
+    it('should get a specific incident (with ID provided)', async () => {
       const incidentId = 'incident-123'
       const specificIncidentEndpoint = `${incidentsEndpoint}/${incidentId}`
 
@@ -283,10 +283,10 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('get_incident', {
+        const request = createMockToolRequest('incidents', {
           incidentId: 'incident-123',
         })
-        const response = (await toolHandlers.get_incident(
+        const response = (await toolHandlers.incidents(
           request,
         )) as unknown as DatadogToolResponse
 
@@ -316,10 +316,10 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('get_incident', {
+        const request = createMockToolRequest('incidents', {
           incidentId: 'non-existent-incident',
         })
-        await expect(toolHandlers.get_incident(request)).rejects.toThrow(
+        await expect(toolHandlers.incidents(request)).rejects.toThrow(
           'Incident not found',
         )
       })()
@@ -340,10 +340,10 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('get_incident', {
+        const request = createMockToolRequest('incidents', {
           incidentId: 'incident-123',
         })
-        await expect(toolHandlers.get_incident(request)).rejects.toThrow(
+        await expect(toolHandlers.incidents(request)).rejects.toThrow(
           'No incident data returned',
         )
       })()
@@ -365,10 +365,10 @@ describe('Incident Tool', () => {
       const server = setupServer(mockHandler)
 
       await server.boundary(async () => {
-        const request = createMockToolRequest('get_incident', {
+        const request = createMockToolRequest('incidents', {
           incidentId: 'incident-123',
         })
-        await expect(toolHandlers.get_incident(request)).rejects.toThrow(
+        await expect(toolHandlers.incidents(request)).rejects.toThrow(
           'Internal server error',
         )
       })()

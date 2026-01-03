@@ -2,6 +2,8 @@ import { ExtendedTool, ToolHandlers } from '../../utils/types'
 import { v1 } from '@datadog/datadog-api-client'
 import { createToolSchema } from '../../utils/tool'
 import { GetDashboardZodSchema, ListDashboardsZodSchema } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type DashboardsToolName = 'list_dashboards' | 'get_dashboard'
 type DashboardsTool = ExtendedTool<DashboardsToolName>
@@ -26,13 +28,17 @@ export const createDashboardsToolHandlers = (
 ): DashboardsToolHandlers => {
   return {
     list_dashboards: async (request) => {
-      const { name, tags } = ListDashboardsZodSchema.parse(
+      const { name, tags } = parseWithWarnings(
+        ListDashboardsZodSchema,
         request.params.arguments,
+        'list_dashboards',
       )
 
-      const response = await apiInstance.listDashboards({
-        filterShared: false,
-      })
+      const response = await withRetry(() =>
+        apiInstance.listDashboards({
+          filterShared: false,
+        }),
+      )
 
       if (!response.dashboards) {
         throw new Error('No dashboards data returned')
@@ -68,13 +74,17 @@ export const createDashboardsToolHandlers = (
       }
     },
     get_dashboard: async (request) => {
-      const { dashboardId } = GetDashboardZodSchema.parse(
+      const { dashboardId } = parseWithWarnings(
+        GetDashboardZodSchema,
         request.params.arguments,
+        'get_dashboard',
       )
 
-      const response = await apiInstance.getDashboard({
-        dashboardId,
-      })
+      const response = await withRetry(() =>
+        apiInstance.getDashboard({
+          dashboardId,
+        }),
+      )
 
       return {
         content: [

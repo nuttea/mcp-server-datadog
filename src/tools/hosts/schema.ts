@@ -15,11 +15,17 @@ import { z } from 'zod'
  * @param override - Optional. Controls whether to replace an existing mute's end time
  */
 export const MuteHostZodSchema = z.object({
-  hostname: z.string().describe('The name of the host to mute'),
+  hostname: z
+    .string()
+    .max(255)
+    .describe('The name of the host to mute (max 255 chars)'),
   message: z
     .string()
+    .max(5000)
     .optional()
-    .describe('Message to associate with the muting of this host'),
+    .describe(
+      'Message to associate with the muting of this host (max 5000 chars)',
+    ),
   end: z
     .number()
     .int()
@@ -41,7 +47,10 @@ export const MuteHostZodSchema = z.object({
  * @param hostname - Required. Identifies the host to be unmuted
  */
 export const UnmuteHostZodSchema = z.object({
-  hostname: z.string().describe('The name of the host to unmute'),
+  hostname: z
+    .string()
+    .max(255)
+    .describe('The name of the host to unmute (max 255 chars)'),
 })
 
 /**
@@ -76,19 +85,34 @@ export const GetActiveHostsCountZodSchema = z.object({
  * @param include_hosts_metadata - Optional. Include detailed host metadata
  */
 export const ListHostsZodSchema = z.object({
-  filter: z.string().optional().describe('Filter string for search results'),
-  sort_field: z.string().optional().describe('Field to sort hosts by'),
+  filter: z
+    .string()
+    .max(255)
+    .optional()
+    .describe('Filter string for search results (max 255 chars)'),
+  sort_field: z
+    .string()
+    .max(100)
+    .optional()
+    .describe('Field to sort hosts by (max 100 chars)'),
   sort_dir: z.string().optional().describe('Sort direction (asc/desc)'),
-  start: z.number().int().optional().describe('Starting offset for pagination'),
+  start: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Starting offset for pagination'),
   count: z
     .number()
     .int()
+    .min(1)
     .max(1000)
     .optional()
-    .describe('Max number of hosts to return (max: 1000)'),
+    .describe('Max number of hosts to return (1-1000)'),
   from: z
     .number()
     .int()
+    .min(0)
     .optional()
     .describe('Search hosts from this UNIX timestamp'),
   include_muted_hosts_data: z

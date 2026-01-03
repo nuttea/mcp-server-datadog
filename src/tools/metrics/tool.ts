@@ -2,6 +2,8 @@ import { ExtendedTool, ToolHandlers } from '../../utils/types'
 import { v1 } from '@datadog/datadog-api-client'
 import { createToolSchema } from '../../utils/tool'
 import { QueryMetricsZodSchema } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type MetricsToolName = 'query_metrics'
 type MetricsTool = ExtendedTool<MetricsToolName>
@@ -21,15 +23,19 @@ export const createMetricsToolHandlers = (
 ): MetricsToolHandlers => {
   return {
     query_metrics: async (request) => {
-      const { from, to, query } = QueryMetricsZodSchema.parse(
+      const { from, to, query } = parseWithWarnings(
+        QueryMetricsZodSchema,
         request.params.arguments,
+        'query_metrics',
       )
 
-      const response = await apiInstance.queryMetrics({
-        from,
-        to,
-        query,
-      })
+      const response = await withRetry(() =>
+        apiInstance.queryMetrics({
+          from,
+          to,
+          query,
+        }),
+      )
 
       return {
         content: [

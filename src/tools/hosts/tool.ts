@@ -7,6 +7,8 @@ import {
   MuteHostZodSchema,
   UnmuteHostZodSchema,
 } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 /**
  * This module implements Datadog host management tools for muting, unmuting,
@@ -61,18 +63,22 @@ export const createHostsToolHandlers = (
      * Silences alerts and notifications for the host until unmuted or until the specified end time.
      */
     mute_host: async (request) => {
-      const { hostname, message, end, override } = MuteHostZodSchema.parse(
+      const { hostname, message, end, override } = parseWithWarnings(
+        MuteHostZodSchema,
         request.params.arguments,
+        'mute_host',
       )
 
-      await apiInstance.muteHost({
-        hostName: hostname,
-        body: {
-          message,
-          end,
-          override,
-        },
-      })
+      await withRetry(() =>
+        apiInstance.muteHost({
+          hostName: hostname,
+          body: {
+            message,
+            end,
+            override,
+          },
+        }),
+      )
 
       return {
         content: [
@@ -96,11 +102,17 @@ export const createHostsToolHandlers = (
      * Re-enables alerts and notifications for the specified host.
      */
     unmute_host: async (request) => {
-      const { hostname } = UnmuteHostZodSchema.parse(request.params.arguments)
+      const { hostname } = parseWithWarnings(
+        UnmuteHostZodSchema,
+        request.params.arguments,
+        'unmute_host',
+      )
 
-      await apiInstance.unmuteHost({
-        hostName: hostname,
-      })
+      await withRetry(() =>
+        apiInstance.unmuteHost({
+          hostName: hostname,
+        }),
+      )
 
       return {
         content: [
@@ -124,13 +136,17 @@ export const createHostsToolHandlers = (
      * Provides total counts of hosts that are reporting and operational.
      */
     get_active_hosts_count: async (request) => {
-      const { from } = GetActiveHostsCountZodSchema.parse(
+      const { from } = parseWithWarnings(
+        GetActiveHostsCountZodSchema,
         request.params.arguments,
+        'get_active_hosts_count',
       )
 
-      const response = await apiInstance.getHostTotals({
-        from,
-      })
+      const response = await withRetry(() =>
+        apiInstance.getHostTotals({
+          from,
+        }),
+      )
 
       return {
         content: [
@@ -164,18 +180,24 @@ export const createHostsToolHandlers = (
         from,
         include_muted_hosts_data,
         include_hosts_metadata,
-      } = ListHostsZodSchema.parse(request.params.arguments)
+      } = parseWithWarnings(
+        ListHostsZodSchema,
+        request.params.arguments,
+        'list_hosts',
+      )
 
-      const response = await apiInstance.listHosts({
-        filter,
-        sortField: sort_field,
-        sortDir: sort_dir,
-        start,
-        count,
-        from,
-        includeMutedHostsData: include_muted_hosts_data,
-        includeHostsMetadata: include_hosts_metadata,
-      })
+      const response = await withRetry(() =>
+        apiInstance.listHosts({
+          filter,
+          sortField: sort_field,
+          sortDir: sort_dir,
+          start,
+          count,
+          from,
+          includeMutedHostsData: include_muted_hosts_data,
+          includeHostsMetadata: include_hosts_metadata,
+        }),
+      )
 
       if (!response.hostList) {
         throw new Error('No hosts data returned')

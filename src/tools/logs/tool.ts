@@ -3,6 +3,8 @@ import { log } from '../../utils/helper'
 import { createToolSchema } from '../../utils/tool'
 import { ExtendedTool, ToolHandlers } from '../../utils/types'
 import { GetAllServicesZodSchema, GetLogsZodSchema } from './schema'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
 
 type LogsToolName = 'get_logs' | 'get_all_services'
 type LogsTool = ExtendedTool<LogsToolName>
@@ -50,8 +52,10 @@ export const createLogsToolHandlers = (
   apiInstance: v2.LogsApi,
 ): LogsToolHandlers => ({
   get_logs: async (request) => {
-    const { query, from, to, limit } = GetLogsZodSchema.parse(
+    const { query, from, to, limit } = parseWithWarnings(
+      GetLogsZodSchema,
       request.params.arguments,
+      'get_logs',
     )
 
     const configuredStorageTier = getConfiguredStorageTier()
@@ -72,15 +76,17 @@ export const createLogsToolHandlers = (
       filter.storageTier = configuredStorageTier
     }
 
-    const response = await apiInstance.listLogs({
-      body: {
-        filter,
-        page: {
-          limit,
+    const response = await withRetry(() =>
+      apiInstance.listLogs({
+        body: {
+          filter,
+          page: {
+            limit,
+          },
+          sort: '-timestamp',
         },
-        sort: '-timestamp',
-      },
-    })
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No logs data returned')
@@ -97,8 +103,10 @@ export const createLogsToolHandlers = (
   },
 
   get_all_services: async (request) => {
-    const { query, from, to, limit } = GetAllServicesZodSchema.parse(
+    const { query, from, to, limit } = parseWithWarnings(
+      GetAllServicesZodSchema,
       request.params.arguments,
+      'get_all_services',
     )
 
     const configuredStorageTier = getConfiguredStorageTier()
@@ -119,15 +127,17 @@ export const createLogsToolHandlers = (
       filter.storageTier = configuredStorageTier
     }
 
-    const response = await apiInstance.listLogs({
-      body: {
-        filter,
-        page: {
-          limit,
+    const response = await withRetry(() =>
+      apiInstance.listLogs({
+        body: {
+          filter,
+          page: {
+            limit,
+          },
+          sort: '-timestamp',
         },
-        sort: '-timestamp',
-      },
-    })
+      }),
+    )
 
     if (response.data == null) {
       throw new Error('No logs data returned')

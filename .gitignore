@@ -127,3 +127,23 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Reports - Customer Data
+# Keep templates/ for version control, exclude customer assessments
+reports/datadog-assessment-*/
+reports/DELIVERABLES-COMPLETE.md
+!reports/templates/
+
+# Development and local files
+.DS_Store
+.claude/
+.gemini/
+.mcp.json
+/notebooks/
+SESSION_SUMMARY.md
+CLAUDE-FULL.md
+OBSERVABILITY_ISSUES.md
+query-usage-metrics.md
+/run-with-node20.sh
+test-credentials.sh
+update-kiro-debug.sh
