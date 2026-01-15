@@ -136,7 +136,7 @@ reports/DELIVERABLES-COMPLETE.md
 
 # Development and local files
 .DS_Store
-.claude/
+!.claude/skills/
 .gemini/
 .mcp.json
 /notebooks/
