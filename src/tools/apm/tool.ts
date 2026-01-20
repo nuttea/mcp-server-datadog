@@ -443,28 +443,13 @@ export const createAPMToolHandlers = (
         body: {
           data: {
             attributes: {
-              compute: [
-                {
-                  aggregation: 'count',
-                  type: 'total',
-                },
-              ],
+              compute: [{ aggregation: 'count', metric: '@duration' }],
               filter: {
                 from: new Date(from * 1000).toISOString(),
                 to: new Date(to * 1000).toISOString(),
                 query,
               },
-              groupBy: [
-                {
-                  facet: 'service',
-                  limit: 1000,
-                  sort: {
-                    aggregation: 'count',
-                    order: 'desc',
-                    type: 'total',
-                  },
-                },
-              ],
+              groupBy: [{ facet: 'service', limit: 1000 }],
             },
             type: 'aggregate_request',
           },
@@ -472,11 +457,14 @@ export const createAPMToolHandlers = (
       }),
     )
 
-    // Extract unique services
+    // Extract unique services from buckets
+    // response.data is already the buckets array
     const services: string[] = []
     if (response.data && Array.isArray(response.data)) {
       for (const bucket of response.data) {
+        // @ts-expect-error - Datadog SDK types incomplete, 'by' exists at runtime
         if (bucket.by?.service) {
+          // @ts-expect-error - Datadog SDK types incomplete, 'by' exists at runtime
           services.push(bucket.by.service)
         }
       }
