@@ -6,15 +6,19 @@ import {
   GetServiceStatsAggregatedZodSchema,
   GetServiceEndpointsZodSchema,
   GetOperationStatsZodSchema,
+  GetAllAPMServicesZodSchema,
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeframe } from '../../utils/timeframe'
+import { log } from '../../utils/helper'
 
 type APMToolName =
   | 'get_service_stats_realtime'
   | 'get_service_stats_aggregated'
   | 'get_service_endpoints'
   | 'get_operation_stats'
+  | 'get_all_apm_services'
 type APMTool = ExtendedTool<APMToolName>
 
 export const APM_TOOLS: APMTool[] = [
@@ -37,6 +41,11 @@ export const APM_TOOLS: APMTool[] = [
     GetOperationStatsZodSchema,
     'get_operation_stats',
     'Get statistics for a specific operation/endpoint',
+  ),
+  createToolSchema(
+    GetAllAPMServicesZodSchema,
+    'get_all_apm_services',
+    'Discover all APM services sending traces (with optional env filter and timeframe support)',
   ),
 ] as const
 
@@ -393,6 +402,91 @@ export const createAPMToolHandlers = (
         {
           type: 'text',
           text: `Operation Statistics: ${JSON.stringify(stats, null, 2)}`,
+        },
+      ],
+    }
+  },
+
+  /**
+   * Get all APM services
+   * Discovers unique services from APM traces
+   */
+  get_all_apm_services: async (request) => {
+    const params = parseWithWarnings(
+      GetAllAPMServicesZodSchema,
+      request.params.arguments,
+      'get_all_apm_services',
+    )
+
+    // Handle timeframe conversion
+    let from: number
+    let to: number
+
+    if (params.timeframe) {
+      const range = parseTimeframe(params.timeframe)
+      from = range.from
+      to = range.to
+      log(
+        'info',
+        `[get_all_apm_services] Using timeframe: ${params.timeframe} (${new Date(from * 1000).toISOString()} to ${new Date(to * 1000).toISOString()})`,
+      )
+    } else {
+      from = params.from!
+      to = params.to!
+    }
+
+    // Query spans to discover services
+    const query = params.env ? `env:${params.env}` : '*'
+
+    const response = await withRetry(() =>
+      spansApi.aggregateSpans({
+        body: {
+          data: {
+            attributes: {
+              compute: [
+                {
+                  aggregation: 'count',
+                  type: 'total',
+                },
+              ],
+              filter: {
+                from: new Date(from * 1000).toISOString(),
+                to: new Date(to * 1000).toISOString(),
+                query,
+              },
+              groupBy: [
+                {
+                  facet: 'service',
+                  limit: 1000,
+                  sort: {
+                    aggregation: 'count',
+                    order: 'desc',
+                    type: 'total',
+                  },
+                },
+              ],
+            },
+            type: 'aggregate_request',
+          },
+        },
+      }),
+    )
+
+    // Extract unique services
+    const services: string[] = []
+    if (response.data && Array.isArray(response.data)) {
+      for (const bucket of response.data) {
+        if (bucket.by?.service) {
+          services.push(bucket.by.service)
+        }
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `APM Services (${services.length} total): ${JSON.stringify(services.sort())}`,
         },
       ],
     }

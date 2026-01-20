@@ -5,6 +5,7 @@ import { ExtendedTool, ToolHandlers } from '../../utils/types'
 import { GetAllServicesZodSchema, GetLogsZodSchema } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeframe } from '../../utils/timeframe'
 
 type LogsToolName = 'get_logs' | 'get_all_services'
 type LogsTool = ExtendedTool<LogsToolName>
@@ -103,11 +104,30 @@ export const createLogsToolHandlers = (
   },
 
   get_all_services: async (request) => {
-    const { query, from, to, limit } = parseWithWarnings(
+    const params = parseWithWarnings(
       GetAllServicesZodSchema,
       request.params.arguments,
       'get_all_services',
     )
+
+    // Handle timeframe conversion
+    let from: number
+    let to: number
+
+    if (params.timeframe) {
+      // Convert human-friendly timeframe to epoch timestamps
+      const range = parseTimeframe(params.timeframe)
+      from = range.from
+      to = range.to
+      log(
+        'info',
+        `[get_all_services] Using timeframe: ${params.timeframe} (${new Date(from * 1000).toISOString()} to ${new Date(to * 1000).toISOString()})`,
+      )
+    } else {
+      // Use provided from/to or defaults from validation
+      from = params.from!
+      to = params.to!
+    }
 
     const configuredStorageTier = getConfiguredStorageTier()
     const filter: {
@@ -116,7 +136,7 @@ export const createLogsToolHandlers = (
       to: string
       storageTier?: string
     } = {
-      query,
+      query: params.query,
       // `from` and `to` are in epoch seconds, but the Datadog API expects milliseconds
       from: `${from * 1000}`,
       to: `${to * 1000}`,
@@ -132,7 +152,7 @@ export const createLogsToolHandlers = (
         body: {
           filter,
           page: {
-            limit,
+            limit: params.limit,
           },
           sort: '-timestamp',
         },

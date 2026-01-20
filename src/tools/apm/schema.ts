@@ -82,6 +82,61 @@ export const GetOperationStatsZodSchema = z
     message: 'End time must be after start time',
   })
 
+/**
+ * Schema for discovering all APM services
+ * Queries the spans API to find all services sending traces
+ */
+export const GetAllAPMServicesZodSchema = z
+  .object({
+    timeframe: z
+      .string()
+      .optional()
+      .describe(
+        'Human-friendly time range (e.g., "1h", "6h", "24h", "7d", "1w", "30d"). Overrides from/to if provided.',
+      ),
+    from: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('Start time in epoch seconds (defaults to 1 hour ago)'),
+    to: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe('End time in epoch seconds (defaults to now)'),
+    env: z
+      .string()
+      .max(100)
+      .optional()
+      .describe('Environment filter (e.g., prod, dev, staging)'),
+  })
+  .refine(
+    (data) => {
+      if (data.timeframe) return true
+      if (data.from !== undefined && data.to !== undefined) {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      if (data.timeframe) return true
+      if (data.from !== undefined && data.to !== undefined) {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
+
 export type GetServiceStatsRealtimeArgs = z.infer<
   typeof GetServiceStatsRealtimeZodSchema
 >
@@ -92,3 +147,4 @@ export type GetServiceEndpointsArgs = z.infer<
   typeof GetServiceEndpointsZodSchema
 >
 export type GetOperationStatsArgs = z.infer<typeof GetOperationStatsZodSchema>
+export type GetAllAPMServicesArgs = z.infer<typeof GetAllAPMServicesZodSchema>

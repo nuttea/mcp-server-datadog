@@ -40,8 +40,9 @@ export const GetLogsZodSchema = z
  * Defines parameters for querying logs within a time window.
  *
  * @param query - Optional. Additional query filter for log search. Defaults to "*" (all logs)
- * @param from - Required. Start time in epoch seconds
- * @param to - Required. End time in epoch seconds
+ * @param timeframe - Optional. Human-friendly time range (e.g., "1h", "24h", "7d", "1w", "30d")
+ * @param from - Optional. Start time in epoch seconds (defaults to 1 hour ago if not provided)
+ * @param to - Optional. End time in epoch seconds (defaults to now if not provided)
  * @param limit - Optional. Maximum number of logs to search through. Default is 1000.
  */
 export const GetAllServicesZodSchema = z
@@ -53,10 +54,17 @@ export const GetAllServicesZodSchema = z
       .describe(
         'Optional query filter for log search (max 10000 chars, default: *)',
       ),
+    timeframe: z
+      .string()
+      .optional()
+      .describe(
+        'Human-friendly time range (e.g., "1h", "6h", "24h", "7d", "1w", "30d"). Overrides from/to if provided.',
+      ),
     from: z
       .number()
       .int()
       .min(0)
+      .optional()
       .describe(
         'Start time in epoch seconds (defaults to 1 hour ago if not provided)',
       ),
@@ -64,6 +72,7 @@ export const GetAllServicesZodSchema = z
       .number()
       .int()
       .min(0)
+      .optional()
       .describe('End time in epoch seconds (defaults to now if not provided)'),
     limit: z
       .number()
@@ -76,9 +85,31 @@ export const GetAllServicesZodSchema = z
         'Maximum number of logs to search through (1-1000, default: 1000)',
       ),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
-  .refine((data) => data.to - data.from <= 86400 * 90, {
-    message: 'Time range cannot exceed 90 days',
-  })
+  .refine(
+    (data) => {
+      // Skip validation if timeframe is provided (will be converted)
+      if (data.timeframe) return true
+      // If from/to provided, validate them
+      if (data.from !== undefined && data.to !== undefined) {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      // Skip validation if timeframe is provided
+      if (data.timeframe) return true
+      // If from/to provided, validate range
+      if (data.from !== undefined && data.to !== undefined) {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
