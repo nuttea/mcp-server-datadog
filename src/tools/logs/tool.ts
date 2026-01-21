@@ -51,6 +51,7 @@ type LogsToolHandlers = ToolHandlers<LogsToolName>
 
 export const createLogsToolHandlers = (
   apiInstance: v2.LogsApi,
+  serviceDefApi: v2.ServiceDefinitionApi,
 ): LogsToolHandlers => ({
   get_logs: async (request) => {
     const { query, from, to, limit } = parseWithWarnings(
@@ -163,21 +164,42 @@ export const createLogsToolHandlers = (
       throw new Error('No logs data returned')
     }
 
-    // Extract unique services from logs
-    const services = new Set<string>()
+    // Strategy: Combine Service Catalog + Logs for comprehensive discovery
 
+    // 1. Get services from Service Catalog (authoritative source)
+    const servicesFromCatalog = new Set<string>()
+    try {
+      const catalogResponse = await withRetry(() =>
+        serviceDefApi.listServiceDefinitions({ pageSize: 100 }),
+      )
+
+      if (catalogResponse.data) {
+        for (const service of catalogResponse.data) {
+          if (service.attributes?.schema?.ddService) {
+            servicesFromCatalog.add(service.attributes.schema.ddService)
+          }
+        }
+      }
+    } catch {
+      // Service Catalog not available, will use logs only
+    }
+
+    // 2. Get services from logs (may include services not in catalog)
+    const servicesFromLogs = new Set<string>()
     for (const log of response.data) {
-      // Access service attribute from logs based on the Datadog API structure
       if (log.attributes && log.attributes.service) {
-        services.add(log.attributes.service)
+        servicesFromLogs.add(log.attributes.service)
       }
     }
+
+    // 3. Combine both sources
+    const allServices = new Set([...servicesFromCatalog, ...servicesFromLogs])
 
     return {
       content: [
         {
           type: 'text',
-          text: `Services: ${JSON.stringify(Array.from(services).sort())}`,
+          text: `Services: ${JSON.stringify(Array.from(allServices).sort())}`,
         },
       ],
     }

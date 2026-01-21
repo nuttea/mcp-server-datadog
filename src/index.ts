@@ -175,7 +175,10 @@ const datadogConfig = createDatadogConfig({
 const TOOL_HANDLERS: ToolHandlers = {
   ...createIncidentToolHandlers(new v2.IncidentsApi(datadogConfig)),
   ...createMetricsToolHandlers(new v1.MetricsApi(datadogConfig)),
-  ...createLogsToolHandlers(new v2.LogsApi(datadogConfig)),
+  ...createLogsToolHandlers(
+    new v2.LogsApi(datadogConfig),
+    new v2.ServiceDefinitionApi(datadogConfig),
+  ),
   ...createMonitorsToolHandlers(new v1.MonitorsApi(datadogConfig)),
   ...createDashboardsToolHandlers(new v1.DashboardsApi(datadogConfig)),
   ...createTracesToolHandlers(new v2.SpansApi(datadogConfig)),
