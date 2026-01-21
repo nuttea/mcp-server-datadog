@@ -75,12 +75,34 @@ export const createHandlers = (api) => ({
 ## Commands
 
 ```bash
-pnpm install && pnpm build && pnpm test  # 151/151 passing
+pnpm install && pnpm build && pnpm test  # 184/185 passing
 ```
+
+## ⚠️ CRITICAL: Always Test Before Commit
+
+**MANDATORY**: Test with EXPECTED RESULTS before committing!
+
+Workflow:
+
+1. `pnpm build` ✅
+2. `pnpm test` ✅
+3. **Integration test** - Real API call ✅
+4. **VERIFY output** - Matches expectations ✅
+5. `pnpm lint` ✅
+6. **Then commit**
+
+Red Flags:
+
+- ❌ Returns 0 when data exists
+- ❌ "No errors" without checking output
+- ❌ Skip integration testing
+- ❌ Assume working = no errors
+
+**Rule**: Verify results, not just errors!
 
 ## Status
 
-✅ Production-ready | ✅ 100% tests | ✅ Enterprise-grade
+✅ Production-ready | ✅ 184/185 tests | ✅ Enterprise-grade
 
 **Full docs**: See README.md, SECURITY.md, HEALTHCHECK_GUIDE.md
 
