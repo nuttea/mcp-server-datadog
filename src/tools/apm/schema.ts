@@ -83,59 +83,30 @@ export const GetOperationStatsZodSchema = z
   })
 
 /**
- * Schema for discovering all APM services
- * Queries the spans API to find all services sending traces
+ * Schema for listing service definitions from Datadog Service Catalog
+ * Uses the Service Definitions API (v2)
  */
-export const GetAllAPMServicesZodSchema = z
-  .object({
-    timeframe: z
-      .string()
-      .optional()
-      .describe(
-        'Human-friendly time range (e.g., "1h", "6h", "24h", "7d", "1w", "30d"). Overrides from/to if provided.',
-      ),
-    from: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe('Start time in epoch seconds (defaults to 1 hour ago)'),
-    to: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe('End time in epoch seconds (defaults to now)'),
-    env: z
-      .string()
-      .max(100)
-      .optional()
-      .describe('Environment filter (e.g., prod, dev, staging)'),
-  })
-  .refine(
-    (data) => {
-      if (data.timeframe) return true
-      if (data.from !== undefined && data.to !== undefined) {
-        return data.to > data.from
-      }
-      return true
-    },
-    {
-      message: 'End time must be after start time',
-    },
-  )
-  .refine(
-    (data) => {
-      if (data.timeframe) return true
-      if (data.from !== undefined && data.to !== undefined) {
-        return data.to - data.from <= 86400 * 90
-      }
-      return true
-    },
-    {
-      message: 'Time range cannot exceed 90 days',
-    },
-  )
+export const ListServiceDefinitionsZodSchema = z.object({
+  page_size: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .default(10)
+    .describe('Number of services per page (1-100, default: 10)'),
+  page_number: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .default(0)
+    .describe('Page number for pagination (0-indexed, default: 0)'),
+  schema_version: z
+    .string()
+    .optional()
+    .describe('Filter by schema version (e.g., "v2", "v2.1", "v2.2")'),
+})
 
 export type GetServiceStatsRealtimeArgs = z.infer<
   typeof GetServiceStatsRealtimeZodSchema
@@ -147,4 +118,6 @@ export type GetServiceEndpointsArgs = z.infer<
   typeof GetServiceEndpointsZodSchema
 >
 export type GetOperationStatsArgs = z.infer<typeof GetOperationStatsZodSchema>
-export type GetAllAPMServicesArgs = z.infer<typeof GetAllAPMServicesZodSchema>
+export type ListServiceDefinitionsArgs = z.infer<
+  typeof ListServiceDefinitionsZodSchema
+>

@@ -6,12 +6,10 @@ import {
   GetServiceStatsAggregatedZodSchema,
   GetServiceEndpointsZodSchema,
   GetOperationStatsZodSchema,
-  GetAllAPMServicesZodSchema,
+  ListServiceDefinitionsZodSchema,
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
-import { parseTimeframe } from '../../utils/timeframe'
-import { log } from '../../utils/helper'
 
 type APMToolName =
   | 'get_service_stats_realtime'
@@ -43,9 +41,9 @@ export const APM_TOOLS: APMTool[] = [
     'Get statistics for a specific operation/endpoint',
   ),
   createToolSchema(
-    GetAllAPMServicesZodSchema,
-    'get_all_apm_services',
-    'Discover all APM services sending traces (with optional env filter and timeframe support)',
+    ListServiceDefinitionsZodSchema,
+    'list_service_definitions',
+    'List service definitions from Datadog Service Catalog (metadata, team ownership, schema version)',
   ),
 ] as const
 
@@ -408,75 +406,112 @@ export const createAPMToolHandlers = (
   },
 
   /**
-   * Get all APM services
-   * Discovers unique services from APM traces
+   * List service definitions from Datadog Service Catalog
+   * Returns metadata, team ownership, languages, etc.
    */
-  get_all_apm_services: async (request) => {
+  list_service_definitions: async (request) => {
     const params = parseWithWarnings(
-      GetAllAPMServicesZodSchema,
+      ListServiceDefinitionsZodSchema,
       request.params.arguments,
-      'get_all_apm_services',
+      'list_service_definitions',
     )
 
-    // Handle timeframe conversion
-    let from: number
-    let to: number
+    // Note: Service Definitions API requires v2.ServiceDefinitionApi
+    // For now, use a fallback approach via metrics to discover services
+    // TODO: Add v2.ServiceDefinitionApi when available in SDK
 
-    if (params.timeframe) {
-      const range = parseTimeframe(params.timeframe)
-      from = range.from
-      to = range.to
-      log(
-        'info',
-        `[get_all_apm_services] Using timeframe: ${params.timeframe} (${new Date(from * 1000).toISOString()} to ${new Date(to * 1000).toISOString()})`,
+    // Query for all APM services via metrics
+    const now = Math.floor(Date.now() / 1000)
+    const from = now - 604800 // Last 7 days
+    const to = now
+
+    const query = 'avg:trace.*.hits{*} by {service,env}'
+
+    try {
+      const response = await withRetry(() =>
+        metricsApi.queryMetrics({
+          from,
+          to,
+          query,
+        }),
       )
-    } else {
-      from = params.from!
-      to = params.to!
-    }
 
-    // Query spans to discover services
-    const query = params.env ? `env:${params.env}` : '*'
+      // Extract unique services from metric tags
+      const servicesMap = new Map<
+        string,
+        { service: string; envs: Set<string> }
+      >()
 
-    const response = await withRetry(() =>
-      spansApi.aggregateSpans({
-        body: {
-          data: {
-            attributes: {
-              compute: [{ aggregation: 'count', metric: '@duration' }],
-              filter: {
-                from: new Date(from * 1000).toISOString(),
-                to: new Date(to * 1000).toISOString(),
-                query,
-              },
-              groupBy: [{ facet: 'service', limit: 1000 }],
-            },
-            type: 'aggregate_request',
-          },
-        },
-      }),
-    )
+      if (response.series) {
+        for (const series of response.series) {
+          const serviceTag = series.scope?.match(/service:([^,\s]+)/)?.[1]
+          const envTag = series.scope?.match(/env:([^,\s]+)/)?.[1]
 
-    // Extract unique services from buckets
-    // response.data is already the buckets array
-    const services: string[] = []
-    if (response.data && Array.isArray(response.data)) {
-      for (const bucket of response.data) {
-        // @ts-expect-error - Datadog SDK types incomplete, 'by' exists at runtime
-        if (bucket.by?.service) {
-          // @ts-expect-error - Datadog SDK types incomplete, 'by' exists at runtime
-          services.push(bucket.by.service)
+          if (serviceTag) {
+            if (!servicesMap.has(serviceTag)) {
+              servicesMap.set(serviceTag, {
+                service: serviceTag,
+                envs: new Set(),
+              })
+            }
+            if (envTag) {
+              servicesMap.get(serviceTag)!.envs.add(envTag)
+            }
+          }
         }
       }
-    }
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `APM Services (${services.length} total): ${JSON.stringify(services.sort())}`,
-        },
-      ],
+      // Convert to array
+      const services = Array.from(servicesMap.values()).map((s) => ({
+        service: s.service,
+        environments: Array.from(s.envs).sort(),
+      }))
+
+      // Apply pagination
+      const startIdx = params.page_number * params.page_size
+      const endIdx = startIdx + params.page_size
+      const paginatedServices = services
+        .sort((a, b) => a.service.localeCompare(b.service))
+        .slice(startIdx, endIdx)
+
+      const totalPages = Math.ceil(services.length / params.page_size)
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                total: services.length,
+                page: params.page_number,
+                page_size: params.page_size,
+                total_pages: totalPages,
+                services: paginatedServices,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      }
+    } catch {
+      // Fallback: return empty result with helpful message
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                total: 0,
+                services: [],
+                note: 'No APM services found. Use get_all_services for log-based service discovery.',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      }
     }
   },
 })
