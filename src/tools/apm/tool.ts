@@ -10,6 +10,7 @@ import {
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeframe } from '../../utils/timeframe'
 
 type APMToolName =
   | 'get_service_stats_realtime'
@@ -420,10 +421,10 @@ export const createAPMToolHandlers = (
     // For now, use a fallback approach via metrics to discover services
     // TODO: Add v2.ServiceDefinitionApi when available in SDK
 
-    // Query for all APM services via metrics
-    const now = Math.floor(Date.now() / 1000)
-    const from = now - 604800 // Last 7 days
-    const to = now
+    // Convert timeframe to epoch timestamps (default: 30 days)
+    const range = parseTimeframe(params.timeframe)
+    const from = range.from
+    const to = range.to
 
     const query = 'avg:trace.*.hits{*} by {service,env}'
 

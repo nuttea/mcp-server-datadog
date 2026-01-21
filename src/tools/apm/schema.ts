@@ -84,9 +84,16 @@ export const GetOperationStatsZodSchema = z
 
 /**
  * Schema for listing service definitions from Datadog Service Catalog
- * Uses the Service Definitions API (v2)
+ * Uses APM metrics to discover services with environment information
  */
 export const ListServiceDefinitionsZodSchema = z.object({
+  timeframe: z
+    .string()
+    .optional()
+    .default('30d')
+    .describe(
+      'Time range to search for services (default: "30d"). Supports: 1h, 24h, 7d, 1w, 30d, 90d',
+    ),
   page_size: z
     .number()
     .int()
