@@ -186,6 +186,7 @@ const TOOL_HANDLERS: ToolHandlers = {
   ...createAPMToolHandlers(
     new v2.SpansApi(datadogConfig),
     new v1.MetricsApi(datadogConfig),
+    new v2.ServiceDefinitionApi(datadogConfig),
   ),
   ...createNotebooksToolHandlers(new v1.NotebooksApi(datadogConfig)),
 }

@@ -10,7 +10,6 @@ import {
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
-import { parseTimeframe } from '../../utils/timeframe'
 
 type APMToolName =
   | 'get_service_stats_realtime'
@@ -53,6 +52,7 @@ type APMToolHandlers = ToolHandlers<APMToolName>
 export const createAPMToolHandlers = (
   spansApi: v2.SpansApi,
   metricsApi: v1.MetricsApi,
+  serviceDefApi: v2.ServiceDefinitionApi,
 ): APMToolHandlers => ({
   get_service_stats_realtime: async (request) => {
     const { service, from, to, env } = parseWithWarnings(
@@ -417,102 +417,62 @@ export const createAPMToolHandlers = (
       'list_service_definitions',
     )
 
-    // Note: Service Definitions API requires v2.ServiceDefinitionApi
-    // For now, use a fallback approach via metrics to discover services
-    // TODO: Add v2.ServiceDefinitionApi when available in SDK
-
-    // Convert timeframe to epoch timestamps (default: 30 days)
-    const range = parseTimeframe(params.timeframe)
-    const from = range.from
-    const to = range.to
-
-    const query = 'avg:trace.*.hits{*} by {service,env}'
-
-    try {
-      const response = await withRetry(() =>
-        metricsApi.queryMetrics({
-          from,
-          to,
-          query,
-        }),
-      )
-
-      // Extract unique services from metric tags
-      const servicesMap = new Map<
-        string,
-        { service: string; envs: Set<string> }
-      >()
-
-      if (response.series) {
-        for (const series of response.series) {
-          const serviceTag = series.scope?.match(/service:([^,\s]+)/)?.[1]
-          const envTag = series.scope?.match(/env:([^,\s]+)/)?.[1]
-
-          if (serviceTag) {
-            if (!servicesMap.has(serviceTag)) {
-              servicesMap.set(serviceTag, {
-                service: serviceTag,
-                envs: new Set(),
-              })
-            }
-            if (envTag) {
-              servicesMap.get(serviceTag)!.envs.add(envTag)
-            }
-          }
-        }
+    // Use ServiceDefinitionApi to list service definitions
+    const requestParams: v2.ServiceDefinitionApiListServiceDefinitionsRequest =
+      {
+        pageSize: params.page_size,
+        pageNumber: params.page_number,
       }
 
-      // Convert to array
-      const services = Array.from(servicesMap.values()).map((s) => ({
-        service: s.service,
-        environments: Array.from(s.envs).sort(),
-      }))
+    if (params.schema_version) {
+      requestParams.schemaVersion =
+        params.schema_version as v2.ServiceDefinitionSchemaVersions
+    }
 
-      // Apply pagination
-      const startIdx = params.page_number * params.page_size
-      const endIdx = startIdx + params.page_size
-      const paginatedServices = services
-        .sort((a, b) => a.service.localeCompare(b.service))
-        .slice(startIdx, endIdx)
+    const response = await withRetry(() =>
+      serviceDefApi.listServiceDefinitions(requestParams),
+    )
 
-      const totalPages = Math.ceil(services.length / params.page_size)
+    // Extract service information from response
+    const services =
+      response.data?.map((service) => ({
+        service: service.attributes?.schema?.ddService || 'unknown',
+        schema_version: service.attributes?.schema?.schemaVersion || 'v2',
+        team: service.attributes?.schema?.team || null,
+        application: service.attributes?.schema?.application || null,
+        description: service.attributes?.schema?.description || null,
+        tier: service.attributes?.schema?.tier || null,
+        lifecycle: service.attributes?.schema?.lifecycle || null,
+        languages: service.attributes?.schema?.languages || [],
+        type: service.attributes?.schema?.type || null,
+        contacts: service.attributes?.schema?.contacts || [],
+        links: service.attributes?.schema?.links || [],
+        tags: service.attributes?.schema?.tags || [],
+        integrations: service.attributes?.schema?.integrations || {},
+        last_modified: service.attributes?.meta?.lastModifiedTime || null,
+      })) || []
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                total: services.length,
-                page: params.page_number,
-                page_size: params.page_size,
-                total_pages: totalPages,
-                services: paginatedServices,
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      }
-    } catch {
-      // Fallback: return empty result with helpful message
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                total: 0,
-                services: [],
-                note: 'No APM services found. Use get_all_services for log-based service discovery.',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      }
+    const totalServices =
+      response.meta?.pagination?.totalCount || services.length
+    const totalPages = Math.ceil(totalServices / params.page_size)
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              total: totalServices,
+              page: params.page_number,
+              page_size: params.page_size,
+              total_pages: totalPages,
+              services,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
     }
   },
 })
