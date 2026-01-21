@@ -82,15 +82,18 @@ export const createSLOToolHandlers = (
   },
 
   get_slo: async (request) => {
-    const { sloId, withConfiguredAlertIds } = parseWithWarnings(
+    const parsed = parseWithWarnings(
       GetSLOZodSchema,
       request.params.arguments,
       'get_slo',
     )
 
+    // Support both sloId and slo_id for compatibility
+    const sloId = parsed.sloId || parsed.slo_id!
+
     const params: v1.ServiceLevelObjectivesApiGetSLORequest = {
       sloId,
-      withConfiguredAlertIds,
+      withConfiguredAlertIds: parsed.withConfiguredAlertIds,
     }
 
     const response = await withRetry(() => apiInstance.getSLO(params))
@@ -131,17 +134,20 @@ export const createSLOToolHandlers = (
   },
 
   get_slo_history: async (request) => {
-    const { sloId, from, to, target } = parseWithWarnings(
+    const parsed = parseWithWarnings(
       GetSLOHistoryZodSchema,
       request.params.arguments,
       'get_slo_history',
     )
 
+    // Support both sloId and slo_id for compatibility
+    const sloId = parsed.sloId || parsed.slo_id!
+
     const params: v1.ServiceLevelObjectivesApiGetSLOHistoryRequest = {
       sloId,
-      fromTs: from,
-      toTs: to,
-      target,
+      fromTs: parsed.from,
+      toTs: parsed.to,
+      target: parsed.target,
     }
 
     const response = await withRetry(() => apiInstance.getSLOHistory(params))

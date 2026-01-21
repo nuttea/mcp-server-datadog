@@ -11,12 +11,16 @@ export const GetServiceStatsRealtimeZodSchema = z
       .number()
       .int()
       .min(0)
-      .describe('Start time in epoch seconds (defaults to 1 hour ago)'),
+      .describe(
+        'Start time as Unix timestamp in seconds (NOT ISO string). Example: 1737504000 (defaults to 1 hour ago)',
+      ),
     to: z
       .number()
       .int()
       .min(0)
-      .describe('End time in epoch seconds (defaults to now)'),
+      .describe(
+        'End time as Unix timestamp in seconds (NOT ISO string). Example: 1737590400 (defaults to now)',
+      ),
     env: z
       .string()
       .max(100)
