@@ -10,6 +10,7 @@ import {
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeParam } from '../../utils/relative-time'
 
 type APMToolName =
   | 'get_service_stats_realtime'
@@ -61,6 +62,11 @@ export const createAPMToolHandlers = (
       'get_service_stats_realtime',
     )
 
+    // Convert relative time strings (e.g., "now-7d") to Unix timestamps
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     const envFilter = env ? ` env:${env}` : ''
     const query = `service:${service}${envFilter}`
 
@@ -79,8 +85,8 @@ export const createAPMToolHandlers = (
                 { aggregation: 'max', metric: '@duration' },
               ],
               filter: {
-                from: new Date(from * 1000).toISOString(),
-                to: new Date(to * 1000).toISOString(),
+                from: new Date(fromTimestamp * 1000).toISOString(),
+                to: new Date(toTimestamp * 1000).toISOString(),
                 query,
               },
               groupBy: [{ facet: 'error', limit: 10 }],
@@ -205,6 +211,11 @@ export const createAPMToolHandlers = (
       'get_service_endpoints',
     )
 
+    // Convert relative time strings to Unix timestamps
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     const envFilter = env ? ` env:${env}` : ''
     const query = `service:${service}${envFilter}`
 
@@ -220,8 +231,8 @@ export const createAPMToolHandlers = (
                 { aggregation: 'pc95', metric: '@duration' },
               ],
               filter: {
-                from: new Date(from * 1000).toISOString(),
-                to: new Date(to * 1000).toISOString(),
+                from: new Date(fromTimestamp * 1000).toISOString(),
+                to: new Date(toTimestamp * 1000).toISOString(),
                 query,
               },
               groupBy: [
@@ -322,6 +333,11 @@ export const createAPMToolHandlers = (
       'get_operation_stats',
     )
 
+    // Convert relative time strings to Unix timestamps
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     const envFilter = env ? ` env:${env}` : ''
     const query = `service:${service} resource_name:"${operation}"${envFilter}`
 
@@ -340,8 +356,8 @@ export const createAPMToolHandlers = (
                 { aggregation: 'max', metric: '@duration' },
               ],
               filter: {
-                from: new Date(from * 1000).toISOString(),
-                to: new Date(to * 1000).toISOString(),
+                from: new Date(fromTimestamp * 1000).toISOString(),
+                to: new Date(toTimestamp * 1000).toISOString(),
                 query,
               },
               groupBy: [{ facet: 'error', limit: 10 }],

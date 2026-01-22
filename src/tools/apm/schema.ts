@@ -8,18 +8,14 @@ export const GetServiceStatsRealtimeZodSchema = z
   .object({
     service: z.string().max(255).describe('Service name (max 255 chars)'),
     from: z
-      .number()
-      .int()
-      .min(0)
+      .union([z.number().int().min(0), z.string()])
       .describe(
-        'Start time as Unix timestamp in seconds (NOT ISO string). Example: 1737504000 (defaults to 1 hour ago)',
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-7d" (defaults to 1 hour ago)',
       ),
     to: z
-      .number()
-      .int()
-      .min(0)
+      .union([z.number().int().min(0), z.string()])
       .describe(
-        'End time as Unix timestamp in seconds (NOT ISO string). Example: 1737590400 (defaults to now)',
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
       ),
     env: z
       .string()
