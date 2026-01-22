@@ -62,10 +62,29 @@ export const createAPMToolHandlers = (
       'get_service_stats_realtime',
     )
 
-    // Convert relative time strings (e.g., "now-7d") to Unix timestamps
-    const fromTimestamp =
-      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
-    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+    // Convert time parameters to format accepted by Spans API
+    // Spans API accepts: "now-7d", ISO strings, or we convert timestamps to ISO
+    let fromFilter: string
+    let toFilter: string
+
+    if (typeof from === 'string' && from.startsWith('now')) {
+      // Pass relative time strings directly (e.g., "now-7d")
+      fromFilter = from
+    } else {
+      // Convert Unix timestamp to ISO string
+      const fromTimestamp =
+        parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+      fromFilter = new Date(fromTimestamp * 1000).toISOString()
+    }
+
+    if (typeof to === 'string' && to.startsWith('now')) {
+      // Pass relative time strings directly (e.g., "now")
+      toFilter = to
+    } else {
+      // Convert Unix timestamp to ISO string
+      const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+      toFilter = new Date(toTimestamp * 1000).toISOString()
+    }
 
     const envFilter = env ? ` env:${env}` : ''
     const query = `service:${service}${envFilter}`
@@ -85,8 +104,8 @@ export const createAPMToolHandlers = (
                 { aggregation: 'max', metric: '@duration' },
               ],
               filter: {
-                from: new Date(fromTimestamp * 1000).toISOString(),
-                to: new Date(toTimestamp * 1000).toISOString(),
+                from: fromFilter,
+                to: toFilter,
                 query,
               },
               groupBy: [{ facet: 'error', limit: 10 }],
@@ -97,12 +116,13 @@ export const createAPMToolHandlers = (
       }),
     )
 
-    if (!response.data || !response.data.buckets) {
+    if (!response.data || response.data.length === 0) {
       throw new Error('No APM stats data returned')
     }
 
     // Calculate statistics from response
-    const buckets = response.data.buckets
+    // response.data is the array of buckets directly (not response.data.buckets)
+    const buckets = response.data
     const totalRequests =
       buckets.find((b) => b.by?.error === 'false')?.computes?.c0 || 0
     const totalErrors =
