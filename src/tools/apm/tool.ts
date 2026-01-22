@@ -73,10 +73,9 @@ export const createAPMToolHandlers = (
               compute: [
                 { aggregation: 'count', metric: '@duration' },
                 { aggregation: 'avg', metric: '@duration' },
-                { aggregation: 'p50', metric: '@duration' },
-                { aggregation: 'p75', metric: '@duration' },
-                { aggregation: 'p95', metric: '@duration' },
-                { aggregation: 'p99', metric: '@duration' },
+                { aggregation: 'pc75', metric: '@duration' },
+                { aggregation: 'pc95', metric: '@duration' },
+                { aggregation: 'pc99', metric: '@duration' },
                 { aggregation: 'max', metric: '@duration' },
               ],
               filter: {
@@ -335,10 +334,9 @@ export const createAPMToolHandlers = (
               compute: [
                 { aggregation: 'count', metric: '@duration' },
                 { aggregation: 'avg', metric: '@duration' },
-                { aggregation: 'p50', metric: '@duration' },
-                { aggregation: 'p75', metric: '@duration' },
-                { aggregation: 'p95', metric: '@duration' },
-                { aggregation: 'p99', metric: '@duration' },
+                { aggregation: 'pc75', metric: '@duration' },
+                { aggregation: 'pc95', metric: '@duration' },
+                { aggregation: 'pc99', metric: '@duration' },
                 { aggregation: 'max', metric: '@duration' },
               ],
               filter: {
