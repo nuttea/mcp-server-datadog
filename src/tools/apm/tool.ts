@@ -116,6 +116,9 @@ export const createAPMToolHandlers = (
       }),
     )
 
+    // Debug: Log response structure
+    console.error('DEBUG response:', JSON.stringify(response, null, 2))
+
     if (!response.data || response.data.length === 0) {
       throw new Error('No APM stats data returned')
     }
