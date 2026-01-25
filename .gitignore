@@ -144,6 +144,5 @@ SESSION_SUMMARY.md
 CLAUDE-FULL.md
 OBSERVABILITY_ISSUES.md
 query-usage-metrics.md
-/run-with-node20.sh
 test-credentials.sh
 update-kiro-debug.sh

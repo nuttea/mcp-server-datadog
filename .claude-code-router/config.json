@@ -1,0 +1,22 @@
+{
+  "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+  "Providers": [
+    {
+      "name": "gemini",
+      "api_base_url": "https://generativelanguage.googleapis.com/v1beta/models/",
+      "api_key": "sk-xxx",
+      "models": ["gemini-3-flash-preview", "gemini-3-pro-preview"],
+      "transformer": {
+        "use": ["gemini"]
+      }
+    }
+  ],
+  "Router": {
+    "default": "gemini,gemini-3-flash-preview",
+    "background": "gemini,gemini-3-flash-preview",
+    "think": "gemini",
+    "longContext": "gemini-3-pro-preview",
+    "longContextThreshold": 60000,
+    "webSearch": "gemini-3-flash-preview"
+  }
+}

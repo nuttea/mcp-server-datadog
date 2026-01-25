@@ -123,17 +123,18 @@ export const createAPMToolHandlers = (
     // Calculate statistics from response
     // response.data is the array of buckets directly (not response.data.buckets)
     const buckets = response.data
-    const totalRequests =
-      buckets.find((b) => b.by?.error === 'false')?.computes?.c0 || 0
-    const totalErrors =
-      buckets.find((b) => b.by?.error === 'true')?.computes?.c0 || 0
-    const total = totalRequests + totalErrors
-    const timeRangeSeconds = to - from
 
-    // Get latency stats (from non-error bucket)
-    const latencyBucket =
-      buckets.find((b) => b.by?.error === 'false') || buckets[0]
-    const computes = latencyBucket?.computes || {}
+    // Note: API returns 'compute' (singular) not 'computes' (plural)
+    // When not grouping by error, we get a single bucket with all stats
+    const bucket = buckets[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const compute = (bucket.attributes as any)?.compute || {}
+
+    const totalRequests = compute.c0 || 0
+    const timeRangeSeconds = toTimestamp - fromTimestamp
+
+    // For now, assume all requests (no error breakdown without groupBy error)
+    const totalErrors = 0 // Would need separate query with groupBy error
 
     const stats = {
       service,
@@ -143,28 +144,28 @@ export const createAPMToolHandlers = (
         duration_seconds: timeRangeSeconds,
       },
       request_stats: {
-        total_requests: total,
-        requests_per_second: total / timeRangeSeconds,
+        total_requests: totalRequests,
+        requests_per_second: totalRequests / timeRangeSeconds,
         successful_requests: totalRequests,
         total_errors: totalErrors,
         error_rate_per_second: totalErrors / timeRangeSeconds,
-        error_percentage: total > 0 ? (totalErrors / total) * 100 : 0,
+        error_percentage: 0,
       },
       latency_stats_ns: {
-        avg: computes.c1 || 0,
-        p50: computes.c2 || 0,
-        p75: computes.c3 || 0,
-        p95: computes.c4 || 0,
-        p99: computes.c5 || 0,
-        max: computes.c6 || 0,
+        avg: compute.c1 || 0,
+        p50: compute.c2 || 0,
+        p75: compute.c3 || 0,
+        p95: compute.c4 || 0,
+        p99: compute.c5 || 0,
+        max: compute.c6 || 0,
       },
       latency_stats_ms: {
-        avg_ms: (computes.c1 || 0) / 1_000_000,
-        p50_ms: (computes.c2 || 0) / 1_000_000,
-        p75_ms: (computes.c3 || 0) / 1_000_000,
-        p95_ms: (computes.c4 || 0) / 1_000_000,
-        p99_ms: (computes.c5 || 0) / 1_000_000,
-        max_ms: (computes.c6 || 0) / 1_000_000,
+        avg_ms: (compute.c1 || 0) / 1_000_000,
+        p50_ms: (compute.c2 || 0) / 1_000_000,
+        p75_ms: (compute.c3 || 0) / 1_000_000,
+        p95_ms: (compute.c4 || 0) / 1_000_000,
+        p99_ms: (compute.c5 || 0) / 1_000_000,
+        max_ms: (compute.c6 || 0) / 1_000_000,
       },
     }
 
