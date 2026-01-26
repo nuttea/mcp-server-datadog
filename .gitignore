@@ -168,4 +168,5 @@ examples/*debug*.sh
 # Backup files
 *.backup.*
 .*.backup
-*.bak
+*.bak*.js-e
+*-e
