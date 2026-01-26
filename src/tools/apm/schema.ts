@@ -23,9 +23,18 @@ export const GetServiceStatsRealtimeZodSchema = z
       .optional()
       .describe('Environment filter (e.g., production, staging)'),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
 
 /**
  * Schema for getting aggregated service statistics using Metrics API

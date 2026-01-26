@@ -17,7 +17,7 @@ type APMToolName =
   | 'get_service_stats_aggregated'
   | 'get_service_endpoints'
   | 'get_operation_stats'
-  | 'get_all_apm_services'
+  | 'list_service_definitions'
 type APMTool = ExtendedTool<APMToolName>
 
 export const APM_TOOLS: APMTool[] = [
@@ -62,17 +62,21 @@ export const createAPMToolHandlers = (
       'get_service_stats_realtime',
     )
 
-    // Convert time parameters to format accepted by Spans API
+    // Convert time parameters to format accepted by Spans API and also keep timestamps for calculations
     // Spans API accepts: "now-7d", ISO strings, or we convert timestamps to ISO
     let fromFilter: string
     let toFilter: string
+    let fromTimestamp: number
+    let toTimestamp: number
 
     if (typeof from === 'string' && from.startsWith('now')) {
       // Pass relative time strings directly (e.g., "now-7d")
       fromFilter = from
+      fromTimestamp =
+        parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
     } else {
       // Convert Unix timestamp to ISO string
-      const fromTimestamp =
+      fromTimestamp =
         parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
       fromFilter = new Date(fromTimestamp * 1000).toISOString()
     }
@@ -80,9 +84,10 @@ export const createAPMToolHandlers = (
     if (typeof to === 'string' && to.startsWith('now')) {
       // Pass relative time strings directly (e.g., "now")
       toFilter = to
+      toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
     } else {
       // Convert Unix timestamp to ISO string
-      const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+      toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
       toFilter = new Date(toTimestamp * 1000).toISOString()
     }
 
@@ -108,7 +113,6 @@ export const createAPMToolHandlers = (
                 to: toFilter,
                 query,
               },
-              groupBy: [{ facet: 'error', limit: 10 }],
             },
             type: 'aggregate_request',
           },
@@ -127,17 +131,13 @@ export const createAPMToolHandlers = (
     // response.data is the array of buckets directly (not response.data.buckets)
     const buckets = response.data
 
-    // Note: API returns 'compute' (singular) not 'computes' (plural)
-    // When not grouping by error, we get a single bucket with all stats
+    // Note: API returns 'compute' (plural) as a map of metric names to values
     const bucket = buckets[0]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const compute = (bucket.attributes as any)?.compute || {}
 
     const totalRequests = compute.c0 || 0
     const timeRangeSeconds = toTimestamp - fromTimestamp
-
-    // For now, assume all requests (no error breakdown without groupBy error)
-    const totalErrors = 0 // Would need separate query with groupBy error
 
     const stats = {
       service,
@@ -149,26 +149,20 @@ export const createAPMToolHandlers = (
       request_stats: {
         total_requests: totalRequests,
         requests_per_second: totalRequests / timeRangeSeconds,
-        successful_requests: totalRequests,
-        total_errors: totalErrors,
-        error_rate_per_second: totalErrors / timeRangeSeconds,
-        error_percentage: 0,
       },
       latency_stats_ns: {
         avg: compute.c1 || 0,
-        p50: compute.c2 || 0,
-        p75: compute.c3 || 0,
-        p95: compute.c4 || 0,
-        p99: compute.c5 || 0,
-        max: compute.c6 || 0,
+        p75: compute.c2 || 0,
+        p95: compute.c3 || 0,
+        p99: compute.c4 || 0,
+        max: compute.c5 || 0,
       },
       latency_stats_ms: {
         avg_ms: (compute.c1 || 0) / 1_000_000,
-        p50_ms: (compute.c2 || 0) / 1_000_000,
-        p75_ms: (compute.c3 || 0) / 1_000_000,
-        p95_ms: (compute.c4 || 0) / 1_000_000,
-        p99_ms: (compute.c5 || 0) / 1_000_000,
-        max_ms: (compute.c6 || 0) / 1_000_000,
+        p75_ms: (compute.c2 || 0) / 1_000_000,
+        p95_ms: (compute.c3 || 0) / 1_000_000,
+        p99_ms: (compute.c4 || 0) / 1_000_000,
+        max_ms: (compute.c5 || 0) / 1_000_000,
       },
     }
 
@@ -243,77 +237,85 @@ export const createAPMToolHandlers = (
     const envFilter = env ? ` env:${env}` : ''
     const query = `service:${service}${envFilter}`
 
-    // Get endpoints by grouping spans by resource_name
+    // Use listSpans API to get sample of spans and extract unique resource names
+    // This is a fallback approach when aggregateSpans groupBy doesn't work
     const response = await withRetry(() =>
-      spansApi.aggregateSpans({
+      spansApi.listSpans({
         body: {
           data: {
             attributes: {
-              compute: [
-                { aggregation: 'count', metric: '@duration' },
-                { aggregation: 'avg', metric: '@duration' },
-                { aggregation: 'pc95', metric: '@duration' },
-              ],
               filter: {
                 from: new Date(fromTimestamp * 1000).toISOString(),
                 to: new Date(toTimestamp * 1000).toISOString(),
                 query,
               },
-              groupBy: [
-                { facet: 'resource_name', limit: limit || 100 },
-                { facet: 'error', limit: 2 },
-              ],
+              sort: 'timestamp',
+              page: {
+                limit: 1000, // Get enough spans to capture most endpoints
+              },
             },
-            type: 'aggregate_request',
+            type: 'search_request',
           },
         },
       }),
     )
 
-    if (!response.data || !response.data.buckets) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const responseData = (response as any).data || []
+
+    if (!responseData || responseData.length === 0) {
       throw new Error('No endpoints data returned')
     }
 
-    // Group by resource_name and aggregate error stats
+    // Group spans by resource_name and calculate stats
     const endpointMap = new Map<
       string,
       {
-        requests: number
-        errors: number
-        avg_latency_ms: number
-        p95_latency_ms: number
+        durations: number[]
+        errorCount: number
+        successCount: number
       }
     >()
 
-    response.data.buckets.forEach((bucket) => {
-      const resource = String(bucket.by?.resource_name || 'unknown')
-      const isError = bucket.by?.error === 'true'
-      const count = bucket.computes?.c0 || 0
-      const avgDuration = bucket.computes?.c1 || 0
-      const p95Duration = bucket.computes?.c2 || 0
+    // Debug: Log first span to see structure
+    if (responseData.length > 0) {
+      console.error(
+        'DEBUG first span:',
+        JSON.stringify(responseData[0], null, 2).substring(0, 500),
+      )
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    responseData.forEach((span: any) => {
+      const resource = String(span.attributes?.resource_name || 'unknown')
+      const duration = Number(span.attributes?.custom?.duration || 0)
+      const isError = span.attributes?.status === 'error'
 
       if (!endpointMap.has(resource)) {
         endpointMap.set(resource, {
-          requests: 0,
-          errors: 0,
-          avg_latency_ms: 0,
-          p95_latency_ms: 0,
+          durations: [],
+          errorCount: 0,
+          successCount: 0,
         })
       }
 
       const stats = endpointMap.get(resource)!
+      stats.durations.push(duration)
       if (isError) {
-        stats.errors += count
+        stats.errorCount++
       } else {
-        stats.requests += count
-        stats.avg_latency_ms = avgDuration / 1_000_000
-        stats.p95_latency_ms = p95Duration / 1_000_000
+        stats.successCount++
       }
     })
 
-    // Convert to array and parse HTTP method from resource name
-    const endpoints = Array.from(endpointMap.entries()).map(
-      ([resource, stats]) => {
+    console.error(
+      `DEBUG: Found ${endpointMap.size} unique resource names`,
+      Array.from(endpointMap.keys()).slice(0, 10),
+    )
+
+    // Calculate percentiles and convert to array
+    const endpoints = Array.from(endpointMap.entries())
+      .map(([resource, stats]) => {
         // Try to parse "METHOD /path" from resource_name
         const match = resource.match(
           /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(.+)$/,
@@ -321,21 +323,28 @@ export const createAPMToolHandlers = (
         const method = match?.[1] || 'UNKNOWN'
         const path = match?.[2] || resource
 
-        const totalRequests = stats.requests + stats.errors
+        const totalRequests = stats.successCount + stats.errorCount
+
+        // Calculate average and p95 latency
+        stats.durations.sort((a, b) => a - b)
+        const avgDuration =
+          stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length
+        const p95Index = Math.floor(stats.durations.length * 0.95)
+        const p95Duration = stats.durations[p95Index] || stats.durations[0]
 
         return {
           resource,
           method,
           path,
           requests: totalRequests,
-          errors: stats.errors,
+          errors: stats.errorCount,
           error_rate:
-            totalRequests > 0 ? (stats.errors / totalRequests) * 100 : 0,
-          avg_latency_ms: stats.avg_latency_ms,
-          p95_latency_ms: stats.p95_latency_ms,
+            totalRequests > 0 ? (stats.errorCount / totalRequests) * 100 : 0,
+          avg_latency_ms: avgDuration / 1_000_000,
+          p95_latency_ms: p95Duration / 1_000_000,
         }
-      },
-    )
+      })
+      .slice(0, limit || 100) // Apply limit
 
     // Sort by request count descending
     endpoints.sort((a, b) => b.requests - a.requests)
@@ -384,7 +393,6 @@ export const createAPMToolHandlers = (
                 to: new Date(toTimestamp * 1000).toISOString(),
                 query,
               },
-              groupBy: [{ facet: 'error', limit: 10 }],
             },
             type: 'aggregate_request',
           },
@@ -392,21 +400,27 @@ export const createAPMToolHandlers = (
       }),
     )
 
-    if (!response.data || !response.data.buckets) {
+    if (!response.data || response.data.length === 0) {
       throw new Error('No operation stats data returned')
     }
 
-    const buckets = response.data.buckets
+    // response.data is the array of buckets directly
+    const buckets = response.data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const successBucket =
-      buckets.find((b) => b.by?.error === 'false') || buckets[0]
-    const errorBucket = buckets.find((b) => b.by?.error === 'true')
+      (buckets as any[]).find((b) => b.by?.error === 'false') || buckets[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const errorBucket = (buckets as any[]).find((b) => b.by?.error === 'true')
 
-    const successCount = successBucket?.computes?.c0 || 0
-    const errorCount = errorBucket?.computes?.c0 || 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const successCompute = (successBucket?.attributes as any)?.compute || {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const errorCompute = (errorBucket?.attributes as any)?.compute || {}
+
+    const successCount = successCompute.c0 || 0
+    const errorCount = errorCompute.c0 || 0
     const total = successCount + errorCount
-    const timeRangeSeconds = to - from
-
-    const computes = successBucket?.computes || {}
+    const timeRangeSeconds = toTimestamp - fromTimestamp
 
     const stats = {
       service,
@@ -425,12 +439,11 @@ export const createAPMToolHandlers = (
         error_percentage: total > 0 ? (errorCount / total) * 100 : 0,
       },
       latency_stats_ms: {
-        avg_ms: (computes.c1 || 0) / 1_000_000,
-        p50_ms: (computes.c2 || 0) / 1_000_000,
-        p75_ms: (computes.c3 || 0) / 1_000_000,
-        p95_ms: (computes.c4 || 0) / 1_000_000,
-        p99_ms: (computes.c5 || 0) / 1_000_000,
-        max_ms: (computes.c6 || 0) / 1_000_000,
+        avg_ms: (successCompute.c1 || 0) / 1_000_000,
+        p75_ms: (successCompute.c2 || 0) / 1_000_000,
+        p95_ms: (successCompute.c3 || 0) / 1_000_000,
+        p99_ms: (successCompute.c4 || 0) / 1_000_000,
+        max_ms: (successCompute.c5 || 0) / 1_000_000,
       },
     }
 
@@ -473,25 +486,29 @@ export const createAPMToolHandlers = (
 
     // Extract service information from response
     const services =
-      response.data?.map((service) => ({
-        service: service.attributes?.schema?.ddService || 'unknown',
-        schema_version: service.attributes?.schema?.schemaVersion || 'v2',
-        team: service.attributes?.schema?.team || null,
-        application: service.attributes?.schema?.application || null,
-        description: service.attributes?.schema?.description || null,
-        tier: service.attributes?.schema?.tier || null,
-        lifecycle: service.attributes?.schema?.lifecycle || null,
-        languages: service.attributes?.schema?.languages || [],
-        type: service.attributes?.schema?.type || null,
-        contacts: service.attributes?.schema?.contacts || [],
-        links: service.attributes?.schema?.links || [],
-        tags: service.attributes?.schema?.tags || [],
-        integrations: service.attributes?.schema?.integrations || {},
-        last_modified: service.attributes?.meta?.lastModifiedTime || null,
-      })) || []
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      response.data?.map((service: any) => {
+        const schema = service.attributes?.schema || {}
+        return {
+          service: schema.ddService || schema['dd-service'] || 'unknown',
+          schema_version:
+            schema.schemaVersion || schema['schema-version'] || 'v2',
+          team: schema.team || null,
+          application: schema.application || null,
+          description: schema.description || null,
+          tier: schema.tier || null,
+          lifecycle: schema.lifecycle || null,
+          languages: schema.languages || [],
+          type: schema.type || null,
+          contacts: schema.contacts || [],
+          links: schema.links || [],
+          tags: schema.tags || [],
+          integrations: schema.integrations || {},
+          last_modified: service.attributes?.meta?.lastModifiedTime || null,
+        }
+      }) || []
 
-    const totalServices =
-      response.meta?.pagination?.totalCount || services.length
+    const totalServices = services.length
     const totalPages = Math.ceil(totalServices / params.page_size)
 
     return {

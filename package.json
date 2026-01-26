@@ -1,10 +1,10 @@
 {
-  "name": "@winor30/mcp-server-datadog",
+  "name": "@nuttea/mcp-server-datadog",
   "version": "1.7.0",
   "description": "MCP server for interacting with Datadog API",
   "repository": {
     "type": "git",
-    "url": "https://github.com/winor30/mcp-server-datadog.git"
+    "url": "https://github.com/nuttea/mcp-server-datadog.git"
   },
   "type": "module",
   "bin": {
@@ -32,6 +32,10 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:integration": "node test-all-mcp-tools.js",
+    "test:errors": "node test-error-scenarios.js",
+    "test:apm": "node test-mcp-integration.js",
+    "test:all": "npm test && npm run test:integration && npm run test:errors",
     "lint-staged": "lint-staged"
   },
   "dependencies": {

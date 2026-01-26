@@ -137,12 +137,35 @@ reports/DELIVERABLES-COMPLETE.md
 # Development and local files
 .DS_Store
 !.claude/skills/
+.claude/settings.local.json
 .gemini/
 .mcp.json
 /notebooks/
+
+# Session and temporary files (may contain sensitive data)
 SESSION_SUMMARY.md
 CLAUDE-FULL.md
 OBSERVABILITY_ISSUES.md
 query-usage-metrics.md
+temp_working/*
+
+# Test files that may contain credentials
 test-credentials.sh
+tests/test-credentials.sh
+**/test-credentials.sh
+
+# Example scripts that may contain API keys
 update-kiro-debug.sh
+examples/update-kiro-debug.sh
+examples/*debug*.sh
+
+# Any files containing API keys or secrets (security patterns)
+**/.*_key*
+**/*secret*
+**/*credential*
+**/.*token*
+
+# Backup files
+*.backup.*
+.*.backup
+*.bak
