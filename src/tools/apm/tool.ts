@@ -513,6 +513,7 @@ export const createAPMToolHandlers = (
 
     // response.data is the array of buckets directly
     const buckets = response.data
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const successBucket =
       (buckets as any[]).find(

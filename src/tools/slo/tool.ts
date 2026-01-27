@@ -163,8 +163,8 @@ export const createSLOToolHandlers = (
           text: `SLO History: ${JSON.stringify(
             {
               slo_id: sloId,
-              from_ts: from,
-              to_ts: to,
+              from_ts: parsed.from,
+              to_ts: parsed.to,
               type: response.data.type,
               type_id: response.data.typeId,
               name: response.data.name,

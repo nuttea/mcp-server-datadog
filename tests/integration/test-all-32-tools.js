@@ -162,21 +162,46 @@ async function attemptToolCall(toolName, args) {
       const dataSize = content.length
 
       // Check if result has actual data
-      const hasData = content.includes('[') || content.includes('{')
-      const isEmpty =
-        content.includes('[]') ||
-        content.includes('{}') ||
-        content.includes(': []')
+      // More sophisticated empty detection
+      try {
+        const jsonMatch = content.match(/\{[\s\S]*\}|\[[\s\S]*\]/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
 
-      if (hasData && !isEmpty) {
-        log(colors.green, `   ✅ Success! (${dataSize} bytes)`)
-        const preview = content.substring(0, 200).replace(/\n/g, ' ')
-        log(colors.blue, `   📄 ${preview}...`)
-        return { success: true, dataSize, content }
-      } else {
-        log(colors.yellow, `   ⚠️  Success but empty data`)
-        return { success: true, isEmpty: true, content }
+          // Check for truly empty data
+          const isTrulyEmpty =
+            (Array.isArray(parsed) && parsed.length === 0) ||
+            (typeof parsed === 'object' && Object.keys(parsed).length === 0) ||
+            parsed.total === 0 ||
+            (parsed.slos &&
+              Array.isArray(parsed.slos) &&
+              parsed.slos.length === 0) ||
+            (parsed.notebooks &&
+              Array.isArray(parsed.notebooks) &&
+              parsed.notebooks.length === 0) ||
+            (content.includes('[]') &&
+              !content.includes('"[') &&
+              dataSize < 100)
+
+          if (!isTrulyEmpty) {
+            log(colors.green, `   ✅ Success! (${dataSize} bytes)`)
+            const preview = content.substring(0, 200).replace(/\n/g, ' ')
+            log(colors.blue, `   📄 ${preview}...`)
+            return { success: true, dataSize, content }
+          }
+        }
+      } catch {
+        // If parsing fails, check data size
+        if (dataSize > 100) {
+          log(colors.green, `   ✅ Success! (${dataSize} bytes)`)
+          const preview = content.substring(0, 200).replace(/\n/g, ' ')
+          log(colors.blue, `   📄 ${preview}...`)
+          return { success: true, dataSize, content }
+        }
       }
+
+      log(colors.yellow, `   ⚠️  Success but empty data`)
+      return { success: true, isEmpty: true, content }
     }
 
     log(colors.red, `   ❌ No response`)
@@ -196,9 +221,9 @@ async function runTests() {
   const oneHourAgo = now - 3600
   const sevenDaysAgo = now - 604800
 
-  // Get real services for testing
-  const services = ['mysmartsales_cpf_uat', 'smartids_cpf_uat', 'agent-api']
-  const rumApp = 'c5691cc1-cc7a-42d1-8257-1856826a9aa1'
+  // Get real services for testing (dev environment)
+  const services = ['agent-api', 'burger-api', 'node-example']
+  const rumApp = '5b110902-3a43-4f97-8555-5044453ba16a' // TNI Web
 
   const allTests = [
     // === Incidents (1) ===
@@ -281,10 +306,13 @@ async function runTests() {
     {
       name: 'get_dashboard',
       description: 'Get specific dashboard by ID',
-      args: { dashboardId: 'hjg-cu7-k2j' },
+      args: { dashboardId: 'hjg-cu7-k2j' }, // Bits AI Burger Store
       category: 'Dashboards',
       alternatives: [
-        { description: 'Try another ID', args: { dashboardId: 'cj5-bmf-n3w' } },
+        {
+          description: 'CI Visibility dashboard',
+          args: { dashboardId: 'cj5-bmf-n3w' },
+        },
       ],
     },
 
@@ -441,14 +469,14 @@ async function runTests() {
     {
       name: 'get_slo',
       description: 'Get specific SLO by ID',
-      args: { slo_id: '67d242f542d05793aecf08bfdee343dd' },
+      args: { slo_id: '67d242f542d05793aecf08bfdee343dd' }, // agent-api SLO
       category: 'SLO',
     },
     {
       name: 'get_slo_history',
       description: 'Get SLO history over time',
       args: {
-        slo_id: '67d242f542d05793aecf08bfdee343dd',
+        slo_id: '67d242f542d05793aecf08bfdee343dd', // agent-api SLO
         from: sevenDaysAgo,
         to: now,
       },
@@ -465,24 +493,24 @@ async function runTests() {
     {
       name: 'get_service_stats_realtime',
       description: 'Get real-time APM service statistics',
-      args: { service: services[0], from: 'now-7d', to: 'now', env: 'uat' },
+      args: { service: services[0], from: 'now-7d', to: 'now' }, // agent-api in dev env
       category: 'APM',
       alternatives: [
         {
           description: 'Different service',
-          args: { service: services[2], from: 'now-1h', to: 'now' },
+          args: { service: services[1], from: 'now-7d', to: 'now' }, // burger-api
         },
       ],
     },
     {
       name: 'get_service_stats_aggregated',
       description: 'Get aggregated APM statistics (pre-aggregated metrics)',
-      args: { service: services[0], from: 'now-7d', to: 'now', env: 'uat' },
+      args: { service: services[0], from: 'now-7d', to: 'now' }, // agent-api
       category: 'APM',
       alternatives: [
         {
-          description: 'Different service',
-          args: { service: services[2], from: 'now-1h', to: 'now' },
+          description: 'burger-api service',
+          args: { service: services[1], from: 'now-7d', to: 'now' },
         },
       ],
     },
@@ -490,17 +518,16 @@ async function runTests() {
       name: 'get_service_endpoints',
       description: 'Discover service API endpoints',
       args: {
-        service: services[0],
+        service: services[0], // agent-api
         from: 'now-7d',
         to: 'now',
-        env: 'uat',
         limit: 10,
       },
       category: 'APM',
       alternatives: [
         {
-          description: 'Different service',
-          args: { service: services[2], from: 'now-1h', to: 'now', limit: 10 },
+          description: 'burger-api service',
+          args: { service: services[1], from: 'now-7d', to: 'now', limit: 10 },
         },
       ],
     },
