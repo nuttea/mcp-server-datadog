@@ -37,7 +37,9 @@
     "test:apm": "node tests/integration/test-mcp-integration.js",
     "test:fixes": "node tests/integration/test-high-priority-fixes.js",
     "test:service": "node tests/integration/test-mysmartsales-service.js",
+    "test:notebooks": "node tests/integration/test-notebook-crud.js",
     "test:all": "npm test && npm run test:fixes",
+    "test:all-tools": "node tests/integration/test-all-32-tools.js",
     "lint-staged": "lint-staged"
   },
   "dependencies": {
