@@ -1,6 +1,7 @@
-import { ToolHandlers } from '../../types.js'
-import { parseWithWarnings } from '../../utils/validation.js'
-import { withRetry } from '../../utils/retry.js'
+import { ExtendedTool, ToolHandlers } from '../../utils/types'
+import { parseWithWarnings } from '../../utils/validation'
+import { withRetry } from '../../utils/retry'
+import { createToolSchema } from '../../utils/tool'
 import { v1 } from '@datadog/datadog-api-client'
 import {
   CreateNotebookSchema,
@@ -13,14 +14,54 @@ import {
   type GetNotebookInput,
   type UpdateNotebookInput,
   type DeleteNotebookInput,
-} from './schema.js'
+} from './schema'
 
 /**
  * Datadog Notebooks Tool Handlers
  * https://docs.datadoghq.com/api/latest/notebooks/
  */
 
-export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
+type NotebooksToolName =
+  | 'create_notebook'
+  | 'list_notebooks'
+  | 'get_notebook'
+  | 'update_notebook'
+  | 'delete_notebook'
+type NotebooksTool = ExtendedTool<NotebooksToolName>
+
+export const NOTEBOOKS_TOOLS: NotebooksTool[] = [
+  createToolSchema(
+    CreateNotebookSchema,
+    'create_notebook',
+    'Create a new Datadog Notebook from markdown content',
+  ),
+  createToolSchema(
+    ListNotebooksSchema,
+    'list_notebooks',
+    'List all Datadog Notebooks with optional filtering',
+  ),
+  createToolSchema(
+    GetNotebookSchema,
+    'get_notebook',
+    'Get a specific Datadog Notebook by ID',
+  ),
+  createToolSchema(
+    UpdateNotebookSchema,
+    'update_notebook',
+    'Update an existing Datadog Notebook (name, content, tags, status)',
+  ),
+  createToolSchema(
+    DeleteNotebookSchema,
+    'delete_notebook',
+    'Delete a Datadog Notebook by ID',
+  ),
+] as const
+
+type NotebooksToolHandlers = ToolHandlers<NotebooksToolName>
+
+export const createNotebooksToolHandlers = (
+  api: v1.NotebooksApi,
+): NotebooksToolHandlers => ({
   /**
    * Create a new Datadog Notebook
    */
@@ -34,18 +75,18 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
     // Convert markdown content to notebook cells
     const cells = convertMarkdownToCells(params.content)
 
-    const notebookData = {
+    const notebookData: v1.NotebookCreateRequest = {
       data: {
-        type: 'notebooks',
+        type: 'notebooks' as v1.NotebookResourceType,
         attributes: {
           name: params.name,
           cells,
           time: {
-            liveSpan: params.time_live_span || '1h',
+            liveSpan: (params.time_live_span || '1h') as v1.WidgetLiveSpan,
           },
           ...(params.tags && { tags: params.tags }),
-          ...(params.notify_list && { notify_list: params.notify_list }),
-          status: 'published',
+          ...(params.notify_list && { notifyList: params.notify_list }),
+          status: 'published' as v1.NotebookStatus,
         },
       },
     }
@@ -53,6 +94,10 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
     const result = await withRetry(() =>
       api.createNotebook({ body: notebookData }),
     )
+
+    if (!result.data) {
+      throw new Error('No notebook data returned')
+    }
 
     const notebook = result.data
     return {
@@ -67,7 +112,8 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
               created: notebook.attributes.created,
               modified: notebook.attributes.modified,
               status: notebook.attributes.status,
-              tags: notebook.attributes.tags || [],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              tags: (notebook.attributes as any).tags || [],
             },
             null,
             2,
@@ -88,19 +134,23 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
     )
 
     const queryParams: v1.NotebooksApiListNotebooksRequest = {
-      pageSize: params.count,
-      pageOffset: params.start,
+      count: params.count,
+      start: params.start,
     }
 
-    if (params.author_handle) queryParams.author_handle = params.author_handle
+    if (params.author_handle) queryParams.authorHandle = params.author_handle
     if (params.exclude_author_handle)
-      queryParams.exclude_author_handle = params.exclude_author_handle
-    if (params.sort_field) queryParams.sort_field = params.sort_field
-    if (params.sort_dir) queryParams.sort_dir = params.sort_dir
+      queryParams.excludeAuthorHandle = params.exclude_author_handle
+    if (params.sort_field) queryParams.sortField = params.sort_field
+    if (params.sort_dir) queryParams.sortDir = params.sort_dir
     if (params.query) queryParams.query = params.query
-    if (params.include_cells) queryParams.include_cells = params.include_cells
+    if (params.include_cells) queryParams.includeCells = params.include_cells
 
     const result = await withRetry(() => api.listNotebooks(queryParams))
+
+    if (!result.data) {
+      throw new Error('No notebooks data returned')
+    }
 
     const notebooks = result.data.map((nb) => ({
       id: nb.id,
@@ -112,7 +162,8 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
       created: nb.attributes.created,
       modified: nb.attributes.modified,
       status: nb.attributes.status,
-      tags: nb.attributes.tags || [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tags: (nb.attributes as any).tags || [],
       url: `https://app.${process.env.DATADOG_SITE || 'datadoghq.com'}/notebook/${nb.id}`,
       ...(params.include_cells && {
         cell_count: nb.attributes.cells?.length || 0,
@@ -125,7 +176,8 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
           type: 'text',
           text: JSON.stringify(
             {
-              total: result.meta?.total || notebooks.length,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              total: (result.meta as any)?.total || notebooks.length,
               count: notebooks.length,
               notebooks,
             },
@@ -151,6 +203,10 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
       api.getNotebook({ notebookId: params.notebook_id }),
     )
 
+    if (!result.data) {
+      throw new Error('No notebook data returned')
+    }
+
     const notebook = result.data
     return {
       content: [
@@ -164,7 +220,8 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
               created: notebook.attributes.created,
               modified: notebook.attributes.modified,
               status: notebook.attributes.status,
-              tags: notebook.attributes.tags || [],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              tags: (notebook.attributes as any).tags || [],
               cells: notebook.attributes.cells || [],
               time: notebook.attributes.time,
               url: `https://app.${process.env.DATADOG_SITE || 'datadoghq.com'}/notebook/${notebook.id}`,
@@ -192,10 +249,14 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
       api.getNotebook({ notebookId: params.notebook_id }),
     )
 
+    if (!existing.data) {
+      throw new Error('No existing notebook data returned')
+    }
+
     // Merge updates with existing data
     const updateData: v1.NotebookUpdateRequest = {
       data: {
-        type: 'notebooks',
+        type: 'notebooks' as v1.NotebookResourceType,
         attributes: {
           ...existing.data.attributes,
           name: params.name || existing.data.attributes.name,
@@ -205,8 +266,10 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
     }
 
     if (params.name) updateData.data.attributes.name = params.name
-    if (params.tags) updateData.data.attributes.tags = params.tags
-    if (params.status) updateData.data.attributes.status = params.status
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (params.tags) (updateData.data.attributes as any).tags = params.tags
+    if (params.status)
+      updateData.data.attributes.status = params.status as v1.NotebookStatus
     if (params.content) {
       updateData.data.attributes.cells = convertMarkdownToCells(params.content)
     }
@@ -214,6 +277,10 @@ export const createHandlers = (api: v1.NotebooksApi): ToolHandlers => ({
     const result = await withRetry(() =>
       api.updateNotebook({ notebookId: params.notebook_id, body: updateData }),
     )
+
+    if (!result.data) {
+      throw new Error('No updated notebook data returned')
+    }
 
     const notebook = result.data
     return {

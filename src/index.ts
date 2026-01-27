@@ -7,7 +7,7 @@
  * With a design built for scalability, future integrations with additional Datadog APIs are anticipated.
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
@@ -30,10 +30,10 @@ import { createDowntimesToolHandlers, DOWNTIMES_TOOLS } from './tools/downtimes'
 import { createRumToolHandlers, RUM_TOOLS } from './tools/rum'
 import { createSLOToolHandlers, SLO_TOOLS } from './tools/slo'
 import { createAPMToolHandlers, APM_TOOLS } from './tools/apm'
-import { createHandlers as createNotebooksToolHandlers } from './tools/notebooks'
+import { createNotebooksToolHandlers, NOTEBOOKS_TOOLS } from './tools/notebooks'
 import { v2, v1 } from '@datadog/datadog-api-client'
 
-const server = new Server(
+const server = new McpServer(
   {
     name: 'Datadog MCP Server',
     version: mcpDatadogVersion,
@@ -45,7 +45,7 @@ const server = new Server(
   },
 )
 
-server.onerror = (error) => {
+server.server.onerror = (error) => {
   log('error', `Server error: ${error.message}`, error.stack)
 }
 
@@ -53,96 +53,7 @@ server.onerror = (error) => {
  * Handler that retrieves the list of available tools in the mcp-server-datadog.
  * Currently, it provides incident management functionalities by integrating with Datadog's incident APIs.
  */
-// Notebook tool definitions
-const NOTEBOOKS_TOOLS = [
-  {
-    name: 'create_notebook',
-    description: 'Create a new Datadog Notebook from markdown content',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Notebook name' },
-        content: {
-          type: 'string',
-          description: 'Markdown content for the notebook',
-        },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Tags (e.g., ["team:sre", "assessment"])',
-        },
-        time_live_span: {
-          type: 'string',
-          description: 'Default timeframe (1h, 4h, 1d, 1w, 1mo)',
-        },
-      },
-      required: ['name', 'content'],
-    },
-  },
-  {
-    name: 'list_notebooks',
-    description: 'List all Datadog Notebooks with optional filtering',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        author_handle: { type: 'string', description: 'Filter by author' },
-        query: { type: 'string', description: 'Search query' },
-        count: {
-          type: 'number',
-          description: 'Number to return (max 1000)',
-          default: 100,
-        },
-      },
-    },
-  },
-  {
-    name: 'get_notebook',
-    description: 'Get a specific Datadog Notebook by ID',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        notebook_id: { type: 'number', description: 'Notebook ID' },
-      },
-      required: ['notebook_id'],
-    },
-  },
-  {
-    name: 'update_notebook',
-    description: 'Update an existing Datadog Notebook',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        notebook_id: { type: 'number', description: 'Notebook ID to update' },
-        name: { type: 'string', description: 'New name' },
-        content: { type: 'string', description: 'New markdown content' },
-        tags: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Updated tags',
-        },
-        status: {
-          type: 'string',
-          enum: ['published', 'unpublished'],
-          description: 'Publication status',
-        },
-      },
-      required: ['notebook_id'],
-    },
-  },
-  {
-    name: 'delete_notebook',
-    description: 'Delete a Datadog Notebook',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        notebook_id: { type: 'number', description: 'Notebook ID to delete' },
-      },
-      required: ['notebook_id'],
-    },
-  },
-]
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+server.server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       ...INCIDENT_TOOLS,
@@ -161,13 +72,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   }
 })
 
-if (!process.env.DATADOG_API_KEY || !process.env.DATADOG_APP_KEY) {
+// Check for required environment variables (allow sandbox mode for capability scanning)
+const isSandboxMode = process.env.SMITHERY_SANDBOX === 'true'
+if (
+  !isSandboxMode &&
+  (!process.env.DATADOG_API_KEY || !process.env.DATADOG_APP_KEY)
+) {
   throw new Error('DATADOG_API_KEY and DATADOG_APP_KEY must be set')
 }
 
+// Use mock credentials in sandbox mode for capability scanning
+const apiKey = process.env.DATADOG_API_KEY || 'sandbox-api-key'
+const appKey = process.env.DATADOG_APP_KEY || 'sandbox-app-key'
+
 const datadogConfig = createDatadogConfig({
-  apiKeyAuth: process.env.DATADOG_API_KEY,
-  appKeyAuth: process.env.DATADOG_APP_KEY,
+  apiKeyAuth: apiKey,
+  appKeyAuth: appKey,
   site: process.env.DATADOG_SITE,
   subdomain: process.env.DATADOG_SUBDOMAIN,
 })
@@ -201,7 +121,7 @@ const TOOL_HANDLERS: ToolHandlers = {
  * The TOOL_HANDLERS object contains various tools that interact with different Datadog APIs.
  * By specifying the tool name in the request, the LLM can select and utilize the required tool.
  */
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     if (TOOL_HANDLERS[request.params.name]) {
       return await TOOL_HANDLERS[request.params.name](request)
@@ -231,7 +151,22 @@ async function main() {
   await server.connect(transport)
 }
 
-main().catch((error) => {
-  log('error', 'Server error:', error)
-  process.exit(1)
-})
+/**
+ * Export createSandboxServer for Smithery capability scanning.
+ * Smithery will use this to scan tools without requiring real credentials.
+ */
+export function createSandboxServer() {
+  // Set sandbox mode environment variable
+  process.env.SMITHERY_SANDBOX = 'true'
+
+  // Return the server instance (already created above with sandbox support)
+  return server
+}
+
+// Only start the server if running directly (not being imported for scanning)
+if (typeof process !== 'undefined' && !process.env.SMITHERY_SCANNING) {
+  main().catch((error) => {
+    log('error', 'Server error:', error)
+    process.exit(1)
+  })
+}

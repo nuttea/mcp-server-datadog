@@ -1,2 +1,2 @@
-export { createHandlers } from './tool.js'
-export * from './schema.js'
+export { NOTEBOOKS_TOOLS, createNotebooksToolHandlers } from './tool'
+export * from './schema'

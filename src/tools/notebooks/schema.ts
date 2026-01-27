@@ -107,16 +107,32 @@ export type GetNotebookInput = z.infer<typeof GetNotebookSchema>
 export const UpdateNotebookSchema = z.object({
   notebook_id: z.number().positive().describe('Notebook ID to update'),
 
-  name: z.string().min(1).max(200).optional().describe('New notebook name'),
+  name: z.string().min(1).max(200).optional().describe('Updated notebook name'),
 
-  content: z.string().optional().describe('New markdown content'),
+  content: z
+    .string()
+    .optional()
+    .describe('Updated markdown content (replaces all cells)'),
 
-  tags: z.array(z.string()).optional().describe('Updated tags'),
+  tags: z
+    .array(z.string())
+    .optional()
+    .describe('Updated tags (e.g., ["team:sre", "updated"])'),
 
   status: z
-    .enum(['published', 'unpublished'])
+    .enum(['published'])
     .optional()
-    .describe('Publication status'),
+    .describe('Publication status (only "published" supported by API)'),
+
+  time_live_span: z
+    .string()
+    .optional()
+    .describe('Updated default timeframe (1h, 4h, 1d, 1w, 1mo)'),
+
+  notify_list: z
+    .array(z.string())
+    .optional()
+    .describe('Updated list of handles to notify when modified'),
 })
 
 export type UpdateNotebookInput = z.infer<typeof UpdateNotebookSchema>
