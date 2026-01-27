@@ -14,38 +14,61 @@ cd "$PROJECT_DIR"
 echo "Project directory: $PROJECT_DIR"
 echo ""
 
-# Check if MCP server is built
-if [ ! -f "$PROJECT_DIR/build/index.js" ]; then
-  echo "❌ MCP server not built yet"
-  echo ""
-  echo "Building now..."
-  if command -v pnpm &> /dev/null; then
-    pnpm build
-    if [ $? -ne 0 ]; then
-      echo "❌ Build failed"
-      exit 1
-    fi
-  else
-    echo "❌ pnpm not found. Please install: npm install -g pnpm"
-    exit 1
-  fi
+# Check for pnpm
+if ! command -v pnpm &> /dev/null; then
+  echo "❌ pnpm not found. Please install: npm install -g pnpm"
+  exit 1
 fi
 
-echo "✓ MCP server build found"
+# Install dependencies if needed
+if [ ! -d "$PROJECT_DIR/node_modules" ] || [ -z "$(ls -A "$PROJECT_DIR/node_modules" 2>/dev/null)" ]; then
+  echo "Installing dependencies..."
+  pnpm install
+  if [ $? -ne 0 ]; then
+    echo "❌ Dependency installation failed"
+    exit 1
+  fi
+  echo "✓ Dependencies installed"
+fi
+
+# Check if MCP server is built
+if [ ! -f "$PROJECT_DIR/build/index.js" ]; then
+  echo "Building MCP server..."
+  pnpm build
+  if [ $? -ne 0 ]; then
+    echo "❌ Build failed"
+    exit 1
+  fi
+  echo "✓ Build successful"
+else
+  echo "✓ MCP server build found"
+fi
+
 echo ""
 
 # Verify Datadog credentials
 if [ -z "$DATADOG_API_KEY" ] || [ -z "$DATADOG_APP_KEY" ]; then
   echo "⚠️  Warning: Datadog credentials not found in environment"
   echo ""
-  echo "Run: bash scripts/setup-datadog-env.sh"
-  echo "Then restart your terminal or run: source ~/.bashrc"
+  echo "Please set up credentials first:"
+  echo "  bash scripts/setup-datadog-env.sh"
   echo ""
-  read -p "Continue anyway? (y/N): " CONTINUE
+  echo "Or export them manually:"
+  echo "  export DATADOG_API_KEY=\"your_key_here\""
+  echo "  export DATADOG_APP_KEY=\"your_app_key_here\""
+  echo "  export DATADOG_SITE=\"datadoghq.com\""
+  echo ""
+  read -p "Continue without credentials? (y/N): " CONTINUE
   if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
-    echo "Aborted."
+    echo "Aborted. Please set up credentials first."
     exit 0
   fi
+else
+  echo "✓ Found Datadog credentials:"
+  echo "  API Key: ${DATADOG_API_KEY:0:10}***"
+  echo "  App Key: ${DATADOG_APP_KEY:0:10}***"
+  echo "  Site: ${DATADOG_SITE:-datadoghq.com}"
+  echo ""
 fi
 
 # Check if run-with-node20.sh exists

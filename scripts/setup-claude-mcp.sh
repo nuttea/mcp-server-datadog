@@ -22,16 +22,47 @@ fi
 
 # Get the MCP server path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MCP_SERVER_PATH="$(cd "$SCRIPT_DIR/.." && pwd)/build/index.js"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MCP_SERVER_PATH="$PROJECT_DIR/build/index.js"
 
 # Verify the MCP server exists
 if [ ! -f "$MCP_SERVER_PATH" ]; then
-  echo "❌ MCP server not found at: $MCP_SERVER_PATH"
+  echo "⚠️  MCP server not found at: $MCP_SERVER_PATH"
   echo ""
-  echo "Please build the server first:"
-  echo "  cd ~/mcp-server-datadog"
-  echo "  pnpm install && pnpm build"
-  exit 1
+  read -p "Build the server now? (Y/n): " BUILD_NOW
+
+  if [[ ! "$BUILD_NOW" =~ ^[Nn]$ ]]; then
+    cd "$PROJECT_DIR"
+
+    # Check for pnpm
+    if ! command -v pnpm &> /dev/null; then
+      echo "❌ pnpm not found. Please install: npm install -g pnpm"
+      exit 1
+    fi
+
+    # Install dependencies if needed
+    if [ ! -d "$PROJECT_DIR/node_modules" ] || [ -z "$(ls -A "$PROJECT_DIR/node_modules" 2>/dev/null)" ]; then
+      echo "Installing dependencies..."
+      pnpm install
+      if [ $? -ne 0 ]; then
+        echo "❌ Dependency installation failed"
+        exit 1
+      fi
+    fi
+
+    echo "Building MCP server..."
+    pnpm build
+    if [ $? -ne 0 ]; then
+      echo "❌ Build failed"
+      exit 1
+    fi
+    echo "✓ Build successful"
+  else
+    echo "Please build the server first:"
+    echo "  cd $PROJECT_DIR"
+    echo "  pnpm install && pnpm build"
+    exit 1
+  fi
 fi
 
 echo "✓ Found MCP server at: $MCP_SERVER_PATH"
@@ -42,14 +73,19 @@ if [ -z "$DATADOG_API_KEY" ] || [ -z "$DATADOG_APP_KEY" ]; then
   echo "⚠️  Warning: Datadog credentials not found in environment"
   echo ""
   echo "Please set up Datadog credentials first:"
-  echo "  cd ~/mcp-server-datadog"
   echo "  bash scripts/setup-datadog-env.sh"
   echo ""
-  read -p "Continue anyway? (y/N): " CONTINUE
+  read -p "Continue without credentials? (y/N): " CONTINUE
   if [[ ! "$CONTINUE" =~ ^[Yy]$ ]]; then
     echo "Aborted."
     exit 0
   fi
+else
+  echo "✓ Found Datadog credentials:"
+  echo "  API Key: ${DATADOG_API_KEY:0:10}***"
+  echo "  App Key: ${DATADOG_APP_KEY:0:10}***"
+  echo "  Site: ${DATADOG_SITE:-datadoghq.com}"
+  echo ""
 fi
 
 # Create Claude config directory

@@ -46,15 +46,28 @@ echo ""
 
 cd "$PROJECT_DIR"
 
-if [ ! -f "$PROJECT_DIR/build/index.js" ]; then
-  echo "Building MCP server..."
-  if command -v pnpm &> /dev/null; then
-    pnpm build
-  else
-    echo "❌ pnpm not found. Please install pnpm first:"
-    echo "   npm install -g pnpm"
+# Check for pnpm
+if ! command -v pnpm &> /dev/null; then
+  echo "❌ pnpm not found. Please install pnpm first:"
+  echo "   npm install -g pnpm"
+  exit 1
+fi
+
+# Install dependencies if node_modules doesn't exist or is empty
+if [ ! -d "$PROJECT_DIR/node_modules" ] || [ -z "$(ls -A "$PROJECT_DIR/node_modules" 2>/dev/null)" ]; then
+  echo "Installing dependencies..."
+  pnpm install
+  if [ $? -ne 0 ]; then
+    echo "❌ Dependency installation failed"
     exit 1
   fi
+  echo "✅ Dependencies installed"
+fi
+
+# Build if needed
+if [ ! -f "$PROJECT_DIR/build/index.js" ]; then
+  echo "Building MCP server..."
+  pnpm build
 
   if [ $? -ne 0 ]; then
     echo "❌ Build failed"

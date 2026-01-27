@@ -5,6 +5,66 @@ echo "Datadog Credentials Setup"
 echo "==================================="
 echo ""
 
+# Check if credentials already exist in environment
+if [ -n "$DATADOG_API_KEY" ] && [ -n "$DATADOG_APP_KEY" ]; then
+  echo "✅ Found existing credentials in environment:"
+  echo "   API Key: ${DATADOG_API_KEY:0:10}***"
+  echo "   App Key: ${DATADOG_APP_KEY:0:10}***"
+  echo "   Site: ${DATADOG_SITE:-datadoghq.com}"
+  echo ""
+  read -p "Use existing credentials? (Y/n): " USE_EXISTING
+
+  if [[ ! "$USE_EXISTING" =~ ^[Nn]$ ]]; then
+    DD_API_KEY="$DATADOG_API_KEY"
+    DD_APP_KEY="$DATADOG_APP_KEY"
+    DD_SITE="${DATADOG_SITE:-datadoghq.com}"
+    echo "✅ Using existing credentials"
+    echo ""
+
+    # Skip to shell config detection
+    if [ -f "$HOME/.zshrc" ]; then
+      SHELL_CONFIG="$HOME/.zshrc"
+    elif [ -f "$HOME/.bashrc" ]; then
+      SHELL_CONFIG="$HOME/.bashrc"
+    else
+      SHELL_CONFIG="$HOME/.bashrc"
+      touch "$SHELL_CONFIG"
+    fi
+
+    # Check if already in shell config
+    if grep -q "export DATADOG_API_KEY=" "$SHELL_CONFIG"; then
+      echo "✅ Credentials already configured in $SHELL_CONFIG"
+      echo ""
+      read -p "Test Datadog API connection? (y/N): " TEST_API
+      if [[ "$TEST_API" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "Testing Datadog API connection..."
+        RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "https://api.$DD_SITE/api/v1/validate" \
+          -H "DD-API-KEY: $DD_API_KEY" \
+          -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+
+        if [ "$HTTP_CODE" = "200" ]; then
+          echo "✅ Connection successful! Your credentials are valid."
+        else
+          echo "❌ Connection failed (HTTP $HTTP_CODE)"
+          echo "Please verify your credentials and site setting."
+        fi
+      fi
+      echo ""
+      echo "Setup complete!"
+      exit 0
+    fi
+
+    # Continue to save to shell config
+    echo "Saving credentials to $SHELL_CONFIG..."
+  else
+    echo "Entering new credentials..."
+    echo ""
+  fi
+fi
+
 # Prompt for API Key
 read -p "Enter your Datadog API Key: " DD_API_KEY
 while [ -z "$DD_API_KEY" ]; do
