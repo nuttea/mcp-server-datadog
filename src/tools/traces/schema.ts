@@ -6,8 +6,16 @@ export const ListTracesZodSchema = z
       .string()
       .max(10000)
       .describe('Datadog APM trace query string (max 10000 chars)'),
-    from: z.number().int().min(0).describe('Start time in epoch seconds'),
-    to: z.number().int().min(0).describe('End time in epoch seconds'),
+    from: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-1h" (defaults to 1 hour ago)',
+      ),
+    to: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
+      ),
     limit: z
       .number()
       .int()
@@ -32,11 +40,29 @@ export const ListTracesZodSchema = z
       .optional()
       .describe('Filter by operation name (max 255 chars)'),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
-  .refine((data) => data.to - data.from <= 86400 * 90, {
-    message: 'Time range cannot exceed 90 days',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      // Only validate range if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
 
 export type ListTracesArgs = z.infer<typeof ListTracesZodSchema>

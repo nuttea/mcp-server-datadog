@@ -65,8 +65,10 @@ export function isRelativeTime(value: unknown): boolean {
 
 /**
  * Parse time parameter that can be either:
- * - Number (Unix timestamp in seconds)
+ * - Number (Unix timestamp in seconds or milliseconds)
  * - Relative string ("now-7d")
+ *
+ * Automatically detects and converts milliseconds to seconds
  *
  * @param value - Time value (number or string)
  * @returns Unix timestamp in seconds
@@ -77,6 +79,13 @@ export function parseTimeParam(
   if (value === undefined) return undefined
 
   if (typeof value === 'number') {
+    // Detect if timestamp is in milliseconds (13+ digits) vs seconds (10 digits)
+    // Unix timestamp in seconds for year 2000-2100 is 10 digits (946684800 - 4102444800)
+    // Unix timestamp in milliseconds for year 2000-2100 is 13 digits
+    if (value > 10000000000) {
+      // Likely milliseconds, convert to seconds
+      return Math.floor(value / 1000)
+    }
     return value
   }
 

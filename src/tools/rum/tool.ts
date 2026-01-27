@@ -10,6 +10,7 @@ import {
 } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeParam } from '../../utils/relative-time'
 
 type RumToolName =
   | 'get_rum_events'
@@ -82,11 +83,16 @@ export const createRumToolHandlers = (
       'get_rum_events',
     )
 
+    // Convert time parameters to Unix timestamps in seconds
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     const response = await withRetry(() =>
       apiInstance.listRUMEvents({
         filterQuery: query,
-        filterFrom: new Date(from * 1000),
-        filterTo: new Date(to * 1000),
+        filterFrom: new Date(fromTimestamp * 1000),
+        filterTo: new Date(toTimestamp * 1000),
         sort: 'timestamp',
         pageLimit: limit,
       }),
@@ -113,12 +119,17 @@ export const createRumToolHandlers = (
       'get_rum_grouped_event_count',
     )
 
+    // Convert time parameters to Unix timestamps in seconds
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     // For session counts, we need to use a query to count unique sessions
     const response = await withRetry(() =>
       apiInstance.listRUMEvents({
         filterQuery: query !== '*' ? query : undefined,
-        filterFrom: new Date(from * 1000),
-        filterTo: new Date(to * 1000),
+        filterFrom: new Date(fromTimestamp * 1000),
+        filterTo: new Date(toTimestamp * 1000),
         sort: 'timestamp',
         pageLimit: 2000,
       }),
@@ -180,14 +191,19 @@ export const createRumToolHandlers = (
       'get_rum_page_performance',
     )
 
+    // Convert time parameters to Unix timestamps in seconds
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
     // Build a query that focuses on view events with performance metrics
     const viewQuery = query !== '*' ? `@type:view ${query}` : '@type:view'
 
     const response = await withRetry(() =>
       apiInstance.listRUMEvents({
         filterQuery: viewQuery,
-        filterFrom: new Date(from * 1000),
-        filterTo: new Date(to * 1000),
+        filterFrom: new Date(fromTimestamp * 1000),
+        filterTo: new Date(toTimestamp * 1000),
         sort: 'timestamp',
         pageLimit: 2000,
       }),

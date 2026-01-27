@@ -41,13 +41,21 @@ export function parseWithWarnings<T>(
     needsTimeRange
   ) {
     const now = Math.floor(Date.now() / 1000)
+    // Use longer timeframe for service discovery (7 days vs 1 hour)
+    const defaultTimeRange = context.includes('get_all_services')
+      ? 604800 // 7 days for service discovery
+      : 3600 // 1 hour for other tools
+
     data = {
       ...data,
-      from: now - 3600, // 1 hour ago
+      from: now - defaultTimeRange,
       to: now,
       query: (data as Record<string, unknown>).query || '*',
     }
-    log('info', `[${context}] Auto-filled time range: last 1 hour`)
+    const timeDesc = context.includes('get_all_services')
+      ? 'last 7 days'
+      : 'last 1 hour'
+    log('info', `[${context}] Auto-filled time range: ${timeDesc}`)
   }
 
   try {

@@ -1,4 +1,4 @@
-import { v2 } from '@datadog/datadog-api-client'
+import { v2, v1, client } from '@datadog/datadog-api-client'
 import { log } from '../../utils/helper'
 import { createToolSchema } from '../../utils/tool'
 import { ExtendedTool, ToolHandlers } from '../../utils/types'
@@ -6,6 +6,7 @@ import { GetAllServicesZodSchema, GetLogsZodSchema } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
 import { parseTimeframe } from '../../utils/timeframe'
+import { parseTimeParam } from '../../utils/relative-time'
 
 type LogsToolName = 'get_logs' | 'get_all_services'
 type LogsTool = ExtendedTool<LogsToolName>
@@ -52,6 +53,9 @@ type LogsToolHandlers = ToolHandlers<LogsToolName>
 export const createLogsToolHandlers = (
   apiInstance: v2.LogsApi,
   serviceDefApi: v2.ServiceDefinitionApi,
+  metricsApi?: v1.MetricsApi,
+  spansApi?: v2.SpansApi,
+  configuration?: client.Configuration,
 ): LogsToolHandlers => ({
   get_logs: async (request) => {
     const { query, from, to, limit } = parseWithWarnings(
@@ -59,6 +63,11 @@ export const createLogsToolHandlers = (
       request.params.arguments,
       'get_logs',
     )
+
+    // Convert time parameters to Unix timestamps in seconds
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
 
     const configuredStorageTier = getConfiguredStorageTier()
     const filter: {
@@ -68,9 +77,9 @@ export const createLogsToolHandlers = (
       storageTier?: string
     } = {
       query,
-      // `from` and `to` are in epoch seconds, but the Datadog API expects milliseconds
-      from: `${from * 1000}`,
-      to: `${to * 1000}`,
+      // Datadog API expects milliseconds
+      from: `${fromTimestamp * 1000}`,
+      to: `${toTimestamp * 1000}`,
     }
 
     // Add storageTier to filter if configured
@@ -125,46 +134,18 @@ export const createLogsToolHandlers = (
         `[get_all_services] Using timeframe: ${params.timeframe} (${new Date(from * 1000).toISOString()} to ${new Date(to * 1000).toISOString()})`,
       )
     } else {
-      // Use provided from/to or defaults from validation
-      from = params.from!
-      to = params.to!
+      // Use provided from/to or defaults from validation (7 days for service discovery)
+      from =
+        parseTimeParam(params.from) ?? Math.floor(Date.now() / 1000) - 604800 // 7 days
+      to = parseTimeParam(params.to) ?? Math.floor(Date.now() / 1000)
+      log(
+        'info',
+        `[get_all_services] Using time range: last 7 days (${new Date(from * 1000).toISOString()} to ${new Date(to * 1000).toISOString()})`,
+      )
     }
 
-    const configuredStorageTier = getConfiguredStorageTier()
-    const filter: {
-      query: string
-      from: string
-      to: string
-      storageTier?: string
-    } = {
-      query: params.query,
-      // `from` and `to` are in epoch seconds, but the Datadog API expects milliseconds
-      from: `${from * 1000}`,
-      to: `${to * 1000}`,
-    }
-
-    // Add storageTier to filter if configured
-    if (configuredStorageTier) {
-      filter.storageTier = configuredStorageTier
-    }
-
-    const response = await withRetry(() =>
-      apiInstance.listLogs({
-        body: {
-          filter,
-          page: {
-            limit: params.limit,
-          },
-          sort: '-timestamp',
-        },
-      }),
-    )
-
-    if (response.data == null) {
-      throw new Error('No logs data returned')
-    }
-
-    // Strategy: Combine Service Catalog + Logs for comprehensive discovery
+    // Strategy: Use APM metrics (like Datadog UI) + Service Catalog
+    // Skip logs query as it's slow and incomplete
 
     // 1. Get services from Service Catalog (authoritative source)
     const servicesFromCatalog = new Set<string>()
@@ -175,25 +156,87 @@ export const createLogsToolHandlers = (
 
       if (catalogResponse.data) {
         for (const service of catalogResponse.data) {
-          if (service.attributes?.schema?.ddService) {
-            servicesFromCatalog.add(service.attributes.schema.ddService)
+          // Handle both ddService and dd-service field names
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const schema = service.attributes?.schema as any
+          const serviceName = schema?.ddService || schema?.['dd-service']
+          if (serviceName) {
+            servicesFromCatalog.add(serviceName)
           }
         }
       }
+      log(
+        'info',
+        `[get_all_services] Found ${servicesFromCatalog.size} services from Service Catalog`,
+      )
     } catch {
-      // Service Catalog not available, will use logs only
+      // Service Catalog not available
+      log('info', '[get_all_services] Service Catalog not available')
     }
 
-    // 2. Get services from logs (may include services not in catalog)
-    const servicesFromLogs = new Set<string>()
-    for (const log of response.data) {
-      if (log.attributes && log.attributes.service) {
-        servicesFromLogs.add(log.attributes.service)
+    // 2. Get services from APM Services API (exact same endpoint as Datadog UI)
+    const servicesFromAPM = new Set<string>()
+    if (configuration) {
+      try {
+        // Use the APM Services API endpoint (same data as Datadog UI)
+        // GET /api/v2/apm/services?filter[env]=*&filter[from]=xxx&filter[to]=xxx
+        const baseUrl = `https://api.${process.env.DATADOG_SITE || 'datadoghq.com'}`
+        const url = `${baseUrl}/api/v2/apm/services?filter%5Benv%5D=%2A&filter%5Bfrom%5D=${from}&filter%5Bto%5D=${to}&source=mcp&datastore=metrics`
+
+        const response = await withRetry(async () => {
+          // Get API keys from environment or configuration
+          const apiKey =
+            process.env.DATADOG_API_KEY ||
+            (configuration.authMethods.apiKeyAuth as string)
+          const appKey =
+            process.env.DATADOG_APP_KEY ||
+            (configuration.authMethods.appKeyAuth as string)
+
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'DD-API-KEY': apiKey,
+              'DD-APPLICATION-KEY': appKey,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!res.ok) {
+            const errorText = await res.text()
+            throw new Error(`HTTP ${res.status}: ${errorText}`)
+          }
+
+          return res.json()
+        })
+
+        // Response format: { data: { attributes: { services: [...] } } }
+        const services = response?.data?.attributes?.services || []
+        services.forEach((service: string) => servicesFromAPM.add(service))
+
+        log(
+          'info',
+          `[get_all_services] Found ${servicesFromAPM.size} services from APM Services API`,
+        )
+      } catch (error) {
+        // APM Services API not available, fallback to catalog
+        log(
+          'info',
+          `[get_all_services] APM Services API error: ${error}, using catalog only`,
+        )
       }
+    } else {
+      log(
+        'info',
+        '[get_all_services] Configuration not provided, using catalog only',
+      )
     }
 
-    // 3. Combine both sources
-    const allServices = new Set([...servicesFromCatalog, ...servicesFromLogs])
+    // 3. Combine Service Catalog + APM (no logs as per user request)
+    const allServices = new Set([...servicesFromCatalog, ...servicesFromAPM])
+    log(
+      'info',
+      `[get_all_services] Total unique services: ${allServices.size} (Catalog: ${servicesFromCatalog.size}, APM: ${servicesFromAPM.size})`,
+    )
 
     return {
       content: [

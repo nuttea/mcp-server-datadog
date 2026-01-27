@@ -16,8 +16,16 @@ export const GetRumEventsZodSchema = z
       .max(10000)
       .default('')
       .describe('Datadog RUM query string (max 10000 chars)'),
-    from: z.number().int().min(0).describe('Start time in epoch seconds'),
-    to: z.number().int().min(0).describe('End time in epoch seconds'),
+    from: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-1h" (defaults to 1 hour ago)',
+      ),
+    to: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
+      ),
     limit: z
       .number()
       .int()
@@ -27,12 +35,30 @@ export const GetRumEventsZodSchema = z
       .default(100)
       .describe('Maximum number of events to return (1-1000, default: 100)'),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
-  .refine((data) => data.to - data.from <= 86400 * 90, {
-    message: 'Time range cannot exceed 90 days',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      // Only validate range if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
 
 /**
  * Schema for retrieving RUM applications.
@@ -56,8 +82,16 @@ export const GetRumGroupedEventCountZodSchema = z
       .max(10000)
       .default('*')
       .describe('Optional query filter for RUM search (max 10000 chars)'),
-    from: z.number().int().min(0).describe('Start time in epoch seconds'),
-    to: z.number().int().min(0).describe('End time in epoch seconds'),
+    from: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-1h" (defaults to 1 hour ago)',
+      ),
+    to: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
+      ),
     groupBy: z
       .string()
       .max(255)
@@ -67,12 +101,30 @@ export const GetRumGroupedEventCountZodSchema = z
         'Dimension to group results by (max 255 chars, default: application.name)',
       ),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
-  .refine((data) => data.to - data.from <= 86400 * 90, {
-    message: 'Time range cannot exceed 90 days',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      // Only validate range if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
 
 /**
  * Schema for retrieving page performance metrics.
@@ -90,8 +142,16 @@ export const GetRumPagePerformanceZodSchema = z
       .max(10000)
       .default('*')
       .describe('Optional query filter for RUM search (max 10000 chars)'),
-    from: z.number().int().min(0).describe('Start time in epoch seconds'),
-    to: z.number().int().min(0).describe('End time in epoch seconds'),
+    from: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-1h" (defaults to 1 hour ago)',
+      ),
+    to: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
+      ),
     metricNames: z
       .array(z.string().max(255))
       .default([
@@ -101,12 +161,30 @@ export const GetRumPagePerformanceZodSchema = z
       ])
       .describe('Array of metric names to retrieve (each max 255 chars)'),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
-  .refine((data) => data.to - data.from <= 86400 * 90, {
-    message: 'Time range cannot exceed 90 days',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
+  .refine(
+    (data) => {
+      // Only validate range if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to - data.from <= 86400 * 90
+      }
+      return true
+    },
+    {
+      message: 'Time range cannot exceed 90 days',
+    },
+  )
 
 /**
  * Schema for retrieving RUM page waterfall data.

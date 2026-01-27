@@ -183,6 +183,13 @@ export const createAPMToolHandlers = (
       'get_service_stats_aggregated',
     )
 
+    // Convert time parameters to Unix timestamps (Metrics API requires numbers)
+    const fromTimestamp =
+      parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+    const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
+    // Note: Pre-aggregated metrics trace.{service}.request.* only exist for some services
+    // Try to query them, but fall back gracefully if not available
     const envFilter = env ? `,env:${env}` : ''
 
     // Query pre-aggregated APM metrics
@@ -196,13 +203,21 @@ export const createAPMToolHandlers = (
       queries.map((query) =>
         withRetry(() =>
           metricsApi.queryMetrics({
-            from,
-            to,
+            from: fromTimestamp,
+            to: toTimestamp,
             query,
           }),
-        ),
+        ).catch((error) => {
+          // If metric doesn't exist, return empty result
+          console.error(
+            `[get_service_stats_aggregated] Metric query failed: ${error.message}`,
+          )
+          return { series: [] }
+        }),
       ),
     )
+
+    const hasData = results.some((r) => r.series && r.series.length > 0)
 
     const stats = {
       service,
@@ -210,6 +225,9 @@ export const createAPMToolHandlers = (
       request_rate: results[0]?.series?.[0]?.pointlist || [],
       error_rate: results[1]?.series?.[0]?.pointlist || [],
       avg_latency: results[2]?.series?.[0]?.pointlist || [],
+      note: hasData
+        ? undefined
+        : 'Pre-aggregated metrics not available for this service. Use get_service_stats_realtime instead.',
     }
 
     return {
@@ -235,10 +253,11 @@ export const createAPMToolHandlers = (
     const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
 
     const envFilter = env ? ` env:${env}` : ''
-    const query = `service:${service}${envFilter}`
+    // Filter by type:web to get HTTP endpoints (matches Datadog UI behavior)
+    const query = `service:${service}${envFilter} type:web`
 
-    // Use listSpans API to get sample of spans and extract unique resource names
-    // This is a fallback approach when aggregateSpans groupBy doesn't work
+    // Use listSpans API to get sample of web request spans
+    // Filter by type:web to focus on HTTP endpoints like the UI does
     const response = await withRetry(() =>
       spansApi.listSpans({
         body: {
@@ -251,7 +270,7 @@ export const createAPMToolHandlers = (
               },
               sort: 'timestamp',
               page: {
-                limit: 1000, // Get enough spans to capture most endpoints
+                limit: 1000, // Get enough web request spans to capture endpoints
               },
             },
             type: 'search_request',
@@ -277,17 +296,10 @@ export const createAPMToolHandlers = (
       }
     >()
 
-    // Debug: Log first span to see structure
-    if (responseData.length > 0) {
-      console.error(
-        'DEBUG first span:',
-        JSON.stringify(responseData[0], null, 2).substring(0, 500),
-      )
-    }
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     responseData.forEach((span: any) => {
-      const resource = String(span.attributes?.resource_name || 'unknown')
+      // NOTE: SDK uses camelCase: resourceName, NOT resource_name
+      const resource = String(span.attributes?.resourceName || 'unknown')
       const duration = Number(span.attributes?.custom?.duration || 0)
       const isError = span.attributes?.status === 'error'
 
@@ -308,20 +320,87 @@ export const createAPMToolHandlers = (
       }
     })
 
-    console.error(
-      `DEBUG: Found ${endpointMap.size} unique resource names`,
-      Array.from(endpointMap.keys()).slice(0, 10),
-    )
-
     // Calculate percentiles and convert to array
     const endpoints = Array.from(endpointMap.entries())
       .map(([resource, stats]) => {
-        // Try to parse "METHOD /path" from resource_name
-        const match = resource.match(
+        // Detect resource type and parse accordingly
+        let method = 'UNKNOWN'
+        let path = resource
+        let resourceType = 'other'
+
+        // Try to parse HTTP method from resource_name (e.g., "GET /api/products")
+        const httpMatch = resource.match(
           /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(.+)$/,
         )
-        const method = match?.[1] || 'UNKNOWN'
-        const path = match?.[2] || resource
+        if (httpMatch) {
+          method = httpMatch[1]
+          path = httpMatch[2]
+          resourceType = 'http'
+        }
+        // HTTP error codes (404, 500, etc.) - typically GET requests
+        else if (/^\d{3}$/.test(resource)) {
+          method = 'GET'
+          path = resource
+          resourceType = 'http_error'
+        }
+        // Paths starting with / are HTTP paths (GET by default unless specified)
+        else if (resource.startsWith('/')) {
+          method = 'GET'
+          path = resource
+          resourceType = 'http'
+        }
+        // Controller methods (e.g., "ImageController.getImage") - map to HTTP
+        else if (resource.includes('Controller.')) {
+          const methodName = resource.split('.')[1]
+          if (methodName?.toLowerCase().startsWith('get')) {
+            method = 'GET'
+          } else if (methodName?.toLowerCase().startsWith('post')) {
+            method = 'POST'
+          } else if (methodName?.toLowerCase().startsWith('put')) {
+            method = 'PUT'
+          } else if (methodName?.toLowerCase().startsWith('delete')) {
+            method = 'DELETE'
+          } else {
+            method = 'HTTP'
+          }
+          path = resource
+          resourceType = 'http'
+        }
+        // Database operations
+        else if (
+          resource.includes('SELECT') ||
+          resource.includes('INSERT') ||
+          resource.includes('UPDATE') ||
+          resource.includes('DELETE FROM')
+        ) {
+          method = 'SQL'
+          path =
+            resource.substring(0, 100) + (resource.length > 100 ? '...' : '')
+          resourceType = 'database'
+        } else if (
+          resource === 'postgresql.query' ||
+          resource.includes('.query')
+        ) {
+          method = 'DB'
+          path = resource
+          resourceType = 'database'
+        }
+        // Scheduled tasks
+        else if (
+          resource.includes('Schedul') ||
+          resource.includes('.process') ||
+          resource.includes('Trigger')
+        ) {
+          method = 'TASK'
+          path = resource
+          resourceType = 'scheduled_task'
+        }
+        // Everything else (internal methods)
+        else {
+          method = 'METHOD'
+          path = resource
+          resourceType = 'internal'
+        }
 
         const totalRequests = stats.successCount + stats.errorCount
 
@@ -334,6 +413,7 @@ export const createAPMToolHandlers = (
 
         return {
           resource,
+          resource_type: resourceType,
           method,
           path,
           requests: totalRequests,
@@ -349,11 +429,38 @@ export const createAPMToolHandlers = (
     // Sort by request count descending
     endpoints.sort((a, b) => b.requests - a.requests)
 
+    // Group by resource type for better readability
+    const byType = endpoints.reduce(
+      (acc, endpoint) => {
+        if (!acc[endpoint.resource_type]) {
+          acc[endpoint.resource_type] = []
+        }
+        acc[endpoint.resource_type].push(endpoint)
+        return acc
+      },
+      {} as Record<string, typeof endpoints>,
+    )
+
     return {
       content: [
         {
           type: 'text',
-          text: `Service Endpoints (${endpoints.length} found): ${JSON.stringify({ service, endpoints }, null, 2)}`,
+          text: `Service Endpoints (${endpoints.length} found): ${JSON.stringify(
+            {
+              service,
+              total_endpoints: endpoints.length,
+              by_type: Object.keys(byType).reduce(
+                (acc, type) => {
+                  acc[type] = byType[type].length
+                  return acc
+                },
+                {} as Record<string, number>,
+              ),
+              endpoints,
+            },
+            null,
+            2,
+          )}`,
         },
       ],
     }
@@ -408,7 +515,10 @@ export const createAPMToolHandlers = (
     const buckets = response.data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const successBucket =
-      (buckets as any[]).find((b) => b.by?.error === 'false') || buckets[0]
+      (buckets as any[]).find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (b: any) => b.by?.error === 'false',
+      ) || buckets[0]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const errorBucket = (buckets as any[]).find((b) => b.by?.error === 'true')
 

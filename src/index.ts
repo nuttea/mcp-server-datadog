@@ -178,6 +178,9 @@ const TOOL_HANDLERS: ToolHandlers = {
   ...createLogsToolHandlers(
     new v2.LogsApi(datadogConfig),
     new v2.ServiceDefinitionApi(datadogConfig),
+    new v1.MetricsApi(datadogConfig),
+    new v2.SpansApi(datadogConfig),
+    datadogConfig,
   ),
   ...createMonitorsToolHandlers(new v1.MonitorsApi(datadogConfig)),
   ...createDashboardsToolHandlers(new v1.DashboardsApi(datadogConfig)),

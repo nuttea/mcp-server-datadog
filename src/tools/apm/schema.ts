@@ -43,13 +43,30 @@ export const GetServiceStatsRealtimeZodSchema = z
 export const GetServiceStatsAggregatedZodSchema = z
   .object({
     service: z.string().max(255).describe('Service name'),
-    from: z.number().int().min(0).describe('Start time in epoch seconds'),
-    to: z.number().int().min(0).describe('End time in epoch seconds'),
+    from: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'Start time as Unix timestamp in seconds OR relative time string. Examples: 1737504000 or "now-7d" (defaults to 1 hour ago)',
+      ),
+    to: z
+      .union([z.number().int().min(0), z.string()])
+      .describe(
+        'End time as Unix timestamp in seconds OR relative time string. Examples: 1737590400 or "now" (defaults to now)',
+      ),
     env: z.string().max(100).optional().describe('Environment filter'),
   })
-  .refine((data) => data.to > data.from, {
-    message: 'End time must be after start time',
-  })
+  .refine(
+    (data) => {
+      // Only validate time order if both are numbers
+      if (typeof data.to === 'number' && typeof data.from === 'number') {
+        return data.to > data.from
+      }
+      return true
+    },
+    {
+      message: 'End time must be after start time',
+    },
+  )
 
 /**
  * Schema for discovering service endpoints (API paths and methods)

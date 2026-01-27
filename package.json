@@ -35,7 +35,8 @@
     "test:integration": "node test-all-mcp-tools.js",
     "test:errors": "node test-error-scenarios.js",
     "test:apm": "node test-mcp-integration.js",
-    "test:all": "npm test && npm run test:integration && npm run test:errors",
+    "test:fixes": "node test-high-priority-fixes.js",
+    "test:all": "npm test && npm run test:integration && npm run test:fixes",
     "lint-staged": "lint-staged"
   },
   "dependencies": {
