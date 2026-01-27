@@ -32,11 +32,12 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:integration": "node test-all-mcp-tools.js",
-    "test:errors": "node test-error-scenarios.js",
-    "test:apm": "node test-mcp-integration.js",
-    "test:fixes": "node test-high-priority-fixes.js",
-    "test:all": "npm test && npm run test:integration && npm run test:fixes",
+    "test:integration": "node tests/integration/test-all-mcp-tools.js",
+    "test:errors": "node tests/integration/test-error-scenarios.js",
+    "test:apm": "node tests/integration/test-mcp-integration.js",
+    "test:fixes": "node tests/integration/test-high-priority-fixes.js",
+    "test:service": "node tests/integration/test-mysmartsales-service.js",
+    "test:all": "npm test && npm run test:fixes",
     "lint-staged": "lint-staged"
   },
   "dependencies": {
