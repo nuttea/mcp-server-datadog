@@ -1,0 +1,114 @@
+{
+  "timestamp": "2026-01-27T17:23:39.306Z",
+  "summary": {
+    "passed": 7,
+    "failed": 4,
+    "noData": 13,
+    "skipped": 9,
+    "total": 33
+  },
+  "improvements": [
+    {
+      "tool": "incidents",
+      "category": "Incidents",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_logs",
+      "category": "Logs",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "query_metrics",
+      "category": "Metrics",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_monitors",
+      "category": "Monitors",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_dashboard",
+      "category": "Dashboards",
+      "issue": "HTTP-Code: 404\nMessage: {\"errors\":[\"Dashboard with ID hjg-cu7-k2j not found\"]}",
+      "recommendation": "Fix error or improve error message"
+    },
+    {
+      "tool": "list_traces",
+      "category": "Traces",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "list_hosts",
+      "category": "Hosts",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "list_downtimes",
+      "category": "Downtimes",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_rum_applications",
+      "category": "RUM",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_rum_events",
+      "category": "RUM",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "list_slos",
+      "category": "SLO",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_slo",
+      "category": "SLO",
+      "issue": "HTTP-Code: 404\nMessage: {\"errors\":[\"SLO not found: 67d242f542d05793aecf08bfdee343dd not found\"]}",
+      "recommendation": "Fix error or improve error message"
+    },
+    {
+      "tool": "get_slo_history",
+      "category": "SLO",
+      "issue": "HTTP-Code: 404\nMessage: {\"errors\":[\"SLO ID: 67d242f542d05793aecf08bfdee343dd not found\"]}",
+      "recommendation": "Fix error or improve error message"
+    },
+    {
+      "tool": "list_service_definitions",
+      "category": "APM",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_service_stats_aggregated",
+      "category": "APM",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "list_notebooks",
+      "category": "Notebooks",
+      "issue": "Returns empty data",
+      "recommendation": "Add better default parameters or improve documentation"
+    },
+    {
+      "tool": "get_notebook",
+      "category": "Notebooks",
+      "issue": "HTTP-Code: 404\nMessage: {\"errors\":[\"Notebook not found\"]}",
+      "recommendation": "Fix error or improve error message"
+    }
+  ]
+}
