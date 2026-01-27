@@ -6,28 +6,72 @@ This guide shows you how to set up and use the Datadog MCP Server with Claude Co
 
 ## Prerequisites
 
-- Ubuntu system (or similar Linux distribution)
-- Datadog account with API and Application keys
+- Ubuntu system (or similar Linux distribution) or macOS
+- Datadog account with API and Application keys ([Get keys](https://app.datadoghq.com/organization-settings/api-keys))
 - Z.AI account (free tier available at https://z.ai)
+- Node.js 20+ and npm
 
 ---
 
-## TL;DR - Automated Setup
+## Quick Command Reference
 
-**Already have the repo cloned and built?** Run this one-liner:
+**One-liner setup** (after cloning repo):
 
 ```bash
 cd ~/mcp-server-datadog && bash scripts/quickstart-setup.sh
 ```
 
-This will:
+**Individual setup steps**:
 
-- ✅ Set up Datadog credentials interactively
-- ✅ Build the MCP server (if needed)
-- ✅ Configure Claude Code with MCP server
-- ✅ Add GLM 4.7 Flash model mappings
+```bash
+# 1. Clone repository
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
 
-Then follow Step 4 (Install Claude Code) and Step 5.1 (Z.AI setup for API token).
+# 2. Set up Datadog credentials (auto-detects existing)
+bash ~/mcp-server-datadog/scripts/setup-datadog-env.sh
+
+# 3. Configure Claude Code MCP (auto-builds if needed)
+bash ~/mcp-server-datadog/scripts/setup-claude-mcp.sh
+
+# 4. Set up Z.AI token (run separately)
+curl -O "https://cdn.bigmodel.cn/install/claude_code_zai_env.sh" && bash ./claude_code_zai_env.sh
+```
+
+**Verify setup**:
+
+```bash
+# Check credentials
+echo $DATADOG_API_KEY
+
+# Test MCP server
+claude  # Type: "List all available MCP tools"
+```
+
+---
+
+## TL;DR - Automated Setup
+
+**Quick start for experienced users:**
+
+```bash
+cd ~/mcp-server-datadog && bash scripts/quickstart-setup.sh
+```
+
+This intelligent script will:
+
+- ✅ **Detect existing credentials** and offer to reuse them
+- ✅ **Auto-install dependencies** (pnpm install)
+- ✅ **Build the MCP server** (if not already built)
+- ✅ **Configure Claude Code** with MCP server
+- ✅ **Add GLM 4.7 Flash model mappings**
+
+**New features:**
+
+- 🔍 Detects if you've already set up credentials
+- 📦 Automatically installs node_modules if missing
+- 🚀 Skip re-entering credentials on subsequent runs
+
+Then follow **Step 4** (Install Claude Code) and **Step 5.1** (Z.AI API token).
 
 **For detailed step-by-step instructions, continue below.**
 
@@ -53,21 +97,28 @@ node --version  # Should show v20.x.x
 
 ---
 
-## Step 2: Install pnpm and Build MCP Server
+## Step 2: Clone Repository and Install pnpm
 
 ```bash
 # Install pnpm globally
 npm install -g pnpm
 
-# Clone or navigate to the MCP server directory
+# Clone the MCP server repository
 cd ~
 git clone https://github.com/nuttea/mcp-server-datadog
 cd mcp-server-datadog
+```
 
-# Install dependencies
+**Note:** The setup scripts (used in later steps) will automatically:
+
+- Install dependencies with `pnpm install` if `node_modules` is missing
+- Build the server with `pnpm build` if `build/` doesn't exist
+
+**Manual build (optional):**
+
+```bash
+# Only if you want to build manually now
 pnpm install
-
-# Build the server
 pnpm build
 
 # Verify build succeeded
@@ -87,7 +138,9 @@ ls -la build/index.js  # Should exist
 
 ### Run Interactive Setup Script
 
-Use this interactive script to set up your Datadog credentials:
+The setup script now includes **intelligent credential detection**:
+
+**Option 1: From the repository (recommended)**
 
 ```bash
 cd ~/mcp-server-datadog
@@ -100,67 +153,33 @@ bash scripts/setup-datadog-env.sh
 curl -s https://raw.githubusercontent.com/nuttea/mcp-server-datadog/main/scripts/setup-datadog-env.sh | bash
 ```
 
-**Option 3: Create and run the script manually**
+**What the script does:**
 
-```bash
-# Create the setup script
-cat > /tmp/setup-datadog-env.sh << 'EOF'
-#!/bin/bash
+1. 🔍 **Detects existing credentials** in environment
+   - If found: Offers to reuse them (default: Yes)
+   - Shows masked credentials for verification
+2. 💾 **Saves to shell config** (.bashrc or .zshrc)
+   - Auto-detects your shell
+   - Adds export statements
+   - Backs up existing config if overwriting
+3. ✅ **Optional API test** to verify credentials work
+4. 📝 **Lists common Datadog sites** for easy selection
 
-echo "==================================="
-echo "Datadog Credentials Setup"
-echo "==================================="
-echo ""
+**Example output:**
 
-# Prompt for API Key
-read -p "Enter your Datadog API Key: " DD_API_KEY
-while [ -z "$DD_API_KEY" ]; do
-  echo "API Key cannot be empty!"
-  read -p "Enter your Datadog API Key: " DD_API_KEY
-done
+```
+✅ Found existing credentials in environment:
+   API Key: f32d212e49***
+   App Key: 5835119dd2***
+   Site: datadoghq.com
 
-# Prompt for Application Key
-read -p "Enter your Datadog Application Key: " DD_APP_KEY
-while [ -z "$DD_APP_KEY" ]; do
-  echo "Application Key cannot be empty!"
-  read -p "Enter your Datadog Application Key: " DD_APP_KEY
-done
+Use existing credentials? (Y/n): y
+✅ Using existing credentials
+✅ Credentials already configured in ~/.bashrc
 
-# Prompt for Site with default
-read -p "Enter your Datadog Site [datadoghq.com]: " DD_SITE
-DD_SITE=${DD_SITE:-datadoghq.com}
-
-# Detect shell config file
-if [ -f "$HOME/.zshrc" ]; then
-  SHELL_CONFIG="$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-  SHELL_CONFIG="$HOME/.bashrc"
-else
-  SHELL_CONFIG="$HOME/.bashrc"
-  touch "$SHELL_CONFIG"
-fi
-
-# Add credentials to shell config
-echo "" >> "$SHELL_CONFIG"
-echo "# Datadog MCP Server Credentials (added $(date))" >> "$SHELL_CONFIG"
-echo "export DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$SHELL_CONFIG"
-echo "export DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$SHELL_CONFIG"
-echo "export DATADOG_SITE=\"$DD_SITE\"" >> "$SHELL_CONFIG"
-
-echo ""
-echo "✅ Credentials saved to $SHELL_CONFIG"
-echo ""
-echo "To activate in current session, run:"
-echo "  source $SHELL_CONFIG"
-echo ""
-echo "Or start a new terminal session."
-EOF
-
-# Run the script
-bash /tmp/setup-datadog-env.sh
-
-# Source the config to apply immediately
-source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null
+Test Datadog API connection? (y/N): y
+Testing Datadog API connection...
+✅ Connection successful! Your credentials are valid.
 ```
 
 **Common Datadog Sites:**
@@ -171,6 +190,13 @@ source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null
 - `us5.datadoghq.com` - US5
 - `ap1.datadoghq.com` - AP1
 - `ddog-gov.com` - US1-FED
+
+**After setup:**
+
+```bash
+# Apply credentials to current session
+source ~/.bashrc  # or source ~/.zshrc
+```
 
 ---
 
@@ -214,14 +240,32 @@ cd ~/mcp-server-datadog
 bash scripts/setup-claude-mcp.sh
 ```
 
-This script will:
+This intelligent script will:
 
-- Auto-detect the MCP server build path
-- Create or update `~/.claude/settings.json`
-- Add the Datadog MCP server configuration
-- **Configure model mappings for GLM 4.7 Flash** (haiku, sonnet, opus)
-- Preserve existing settings (with backup)
-- Validate the configuration
+- 🔍 **Auto-detect** if MCP server is built
+- 🛠️ **Offer to build** if not found (includes `pnpm install`)
+- 🔑 **Detect Datadog credentials** and show status
+- 📝 **Create or update** `~/.claude/settings.json`
+- 🎯 **Add Datadog MCP server** configuration
+- ✨ **Configure GLM 4.7 Flash** model mappings (haiku, sonnet, opus)
+- 💾 **Preserve existing settings** (with backup)
+- ✅ **Validate configuration** (JSON syntax check)
+
+**Example output:**
+
+```
+✓ Found MCP server at: /Users/you/mcp-server-datadog/build/index.js
+
+✓ Found Datadog credentials:
+  API Key: f32d212e49***
+  App Key: 5835119dd2***
+  Site: datadoghq.com
+
+✓ Updated settings.json with Datadog MCP server
+✓ Updated model mappings for GLM 4.7 Flash
+
+✅ Configuration file is valid JSON
+```
 
 **Option 2: Manual setup with jq**
 
@@ -335,11 +379,15 @@ echo "✅ Project-level MCP configuration created"
 
 **Notes**:
 
-- The setup script (Option 1) configures global settings
-- For project-level, use Option 3 above
-- The script automatically adds GLM 4.7 Flash model mappings to `env` section
-- The MCP server inherits Datadog credentials from your shell environment
-- Make sure Datadog environment variables (Step 3) are set before starting Claude Code
+- ✅ **Option 1 script features**:
+  - Auto-installs dependencies (`pnpm install`) if `node_modules` missing
+  - Auto-builds server if `build/` doesn't exist
+  - Detects and displays existing Datadog credentials
+  - Adds GLM 4.7 Flash model mappings automatically
+- 📂 For **global config**: use Option 1 (affects all projects)
+- 📁 For **project-level**: use Option 3 (only this project)
+- 🔑 MCP server inherits Datadog credentials from your shell environment
+- ⚠️ **Important**: Ensure Datadog environment variables (Step 3) are set before starting Claude Code
 
 ---
 
@@ -521,6 +569,58 @@ Analyze Datadog usage and costs. Recommend optimal tags for chargeback and ident
 ---
 
 ## Troubleshooting
+
+### Setup Script Issues
+
+**Credentials Already Exist**
+
+```bash
+# Script detects existing credentials and offers to reuse them
+# If you want to enter NEW credentials, answer "n" when prompted:
+# Use existing credentials? (Y/n): n
+
+# To clear and re-enter credentials:
+# Edit your shell config and remove the Datadog lines
+nano ~/.bashrc  # or ~/.zshrc
+
+# Or re-run the script and choose to overwrite
+bash scripts/setup-datadog-env.sh
+```
+
+**Dependencies Not Installing**
+
+```bash
+# Manually install dependencies
+cd ~/mcp-server-datadog
+pnpm install
+
+# Or reinstall pnpm
+npm uninstall -g pnpm
+npm install -g pnpm
+```
+
+**Build Failing**
+
+```bash
+# Clean and rebuild
+cd ~/mcp-server-datadog
+rm -rf build node_modules
+pnpm install
+pnpm build
+```
+
+**Credentials Not Loading**
+
+```bash
+# Make sure to source your shell config after setup
+source ~/.bashrc  # or source ~/.zshrc
+
+# Or restart your terminal
+
+# Verify credentials are loaded
+echo $DATADOG_API_KEY
+echo $DATADOG_APP_KEY
+```
 
 ### MCP Server Not Showing Tools
 
