@@ -4,6 +4,7 @@ import { createToolSchema } from '../../utils/tool'
 import { QueryMetricsZodSchema } from './schema'
 import { parseWithWarnings } from '../../utils/validation'
 import { withRetry } from '../../utils/retry'
+import { parseTimeParam } from '../../utils/relative-time'
 
 type MetricsToolName = 'query_metrics'
 type MetricsTool = ExtendedTool<MetricsToolName>
@@ -12,7 +13,7 @@ export const METRICS_TOOLS: MetricsTool[] = [
   createToolSchema(
     QueryMetricsZodSchema,
     'query_metrics',
-    'Query timeseries points of metrics from Datadog',
+    'Query timeseries metrics from Datadog. Supports aggregations (avg, sum, min, max), filtering, grouping, and functions. Format: aggregation:metric.name{filter}[.function()]',
   ),
 ] as const
 
@@ -29,10 +30,15 @@ export const createMetricsToolHandlers = (
         'query_metrics',
       )
 
+      // Parse time parameters to Unix timestamps
+      const fromTimestamp =
+        parseTimeParam(from) ?? Math.floor(Date.now() / 1000) - 3600
+      const toTimestamp = parseTimeParam(to) ?? Math.floor(Date.now() / 1000)
+
       const response = await withRetry(() =>
         apiInstance.queryMetrics({
-          from,
-          to,
+          from: fromTimestamp,
+          to: toTimestamp,
           query,
         }),
       )
