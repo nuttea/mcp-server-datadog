@@ -170,3 +170,6 @@ examples/*debug*.sh
 .*.backup
 *.bak*.js-e
 *-e
+
+# Smithery
+.smithery/*

@@ -2,6 +2,8 @@
 
 This guide shows you how to set up and use the Datadog MCP Server with Claude Code, powered by Z.AI's free GLM 4.7 Flash model.
 
+**⚠️ IMPORTANT**: This guide uses **PROJECT-LEVEL** configuration. You must start Claude Code from the project directory.
+
 ---
 
 ## Prerequisites
@@ -9,41 +11,65 @@ This guide shows you how to set up and use the Datadog MCP Server with Claude Co
 - Ubuntu system (or similar Linux distribution) or macOS
 - Datadog account with API and Application keys ([Get keys](https://app.datadoghq.com/organization-settings/api-keys))
 - Z.AI account (free tier available at https://z.ai)
-- Node.js 20+ and npm
+- **For complete setup**: Nothing! Script installs NVM, Node, pnpm
+- **For quick setup**: Node.js 20+ and pnpm
 
 ---
 
-## Quick Command Reference
+## 🚀 Quick Command Reference
 
-**One-liner setup** (after cloning repo):
+### Option 1: Complete End-to-End Setup (RECOMMENDED)
+
+**Installs everything** (NVM, Node 20, pnpm, dependencies, builds, configures):
+
+```bash
+cd ~/mcp-server-datadog && bash scripts/complete-setup.sh
+```
+
+✨ **Perfect for first-time setup!** Installs all prerequisites automatically.
+
+### Option 2: Quick Setup (Node/pnpm already installed)
 
 ```bash
 cd ~/mcp-server-datadog && bash scripts/quickstart-setup.sh
 ```
 
-**Individual setup steps**:
+📋 **Requires**: Node.js 20+ and pnpm already installed.
+
+### Individual Setup Commands
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog && cd ~/mcp-server-datadog
 
-# 2. Set up Datadog credentials (auto-detects existing)
-bash ~/mcp-server-datadog/scripts/setup-datadog-env.sh
+# 2. Complete end-to-end setup (recommended)
+bash scripts/complete-setup.sh
 
-# 3. Configure Claude Code MCP (auto-builds if needed)
-bash ~/mcp-server-datadog/scripts/setup-claude-mcp.sh
+# OR step-by-step:
+# 2a. Set up Datadog credentials
+bash scripts/setup-datadog-env.sh
 
-# 4. Set up Z.AI token (run separately)
+# 2b. Configure Claude Code (project-level)
+bash scripts/setup-project-mcp.sh
+
+# 3. Set up Z.AI token
 curl -O "https://cdn.bigmodel.cn/install/claude_code_zai_env.sh" && bash ./claude_code_zai_env.sh
+
+# 4. Start Claude Code from project directory
+claude
 ```
 
-**Verify setup**:
+### Verify Setup
 
 ```bash
 # Check credentials
 echo $DATADOG_API_KEY
 
-# Test MCP server
+# Check project config files
+ls -la .mcp.json .claude/settings.local.json
+
+# Test MCP server (run from project directory)
+cd ~/mcp-server-datadog
 claude  # Type: "List all available MCP tools"
 ```
 
@@ -51,27 +77,37 @@ claude  # Type: "List all available MCP tools"
 
 ## TL;DR - Automated Setup
 
-**Quick start for experienced users:**
+### 🎯 Complete End-to-End Setup (RECOMMENDED)
+
+**For first-time users - installs everything:**
 
 ```bash
-cd ~/mcp-server-datadog && bash scripts/quickstart-setup.sh
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+cd ~/mcp-server-datadog
+bash scripts/complete-setup.sh
 ```
 
-This intelligent script will:
+This comprehensive script installs and configures:
 
-- ✅ **Detect existing credentials** and offer to reuse them
-- ✅ **Auto-install dependencies** (pnpm install)
-- ✅ **Build the MCP server** (if not already built)
-- ✅ **Configure Claude Code** with MCP server
-- ✅ **Add GLM 4.7 Flash model mappings**
+- ✅ **NVM** (Node Version Manager)
+- ✅ **Node.js 20**
+- ✅ **pnpm** package manager
+- ✅ **Datadog credentials** (interactive setup with detection)
+- ✅ **Dependencies** (pnpm install)
+- ✅ **MCP server build**
+- ✅ **Claude Code** (project-level configuration)
+- ✅ **GLM 4.7 Flash** model mappings
 
-**New features:**
+**Configuration type: PROJECT LEVEL**
 
-- 🔍 Detects if you've already set up credentials
-- 📦 Automatically installs node_modules if missing
-- 🚀 Skip re-entering credentials on subsequent runs
+- Creates `.mcp.json` in project root
+- Creates `.claude/settings.local.json` in project
+- Claude Code must be run from project directory
 
-Then follow **Step 4** (Install Claude Code) and **Step 5.1** (Z.AI API token).
+Then:
+
+1. Set up Z.AI API token (see instructions in script output)
+2. Start Claude Code from project directory: `claude`
 
 **For detailed step-by-step instructions, continue below.**
 
@@ -229,24 +265,26 @@ This script will:
 - Configure Claude Code to use Z.AI as the model provider
 - Set up GLM 4.7 Flash as the default model
 
-### 5.2 Add MCP Server Configuration
+### 5.2 Configure Claude Code (Project Level)
 
-Add the Datadog MCP server to your Claude Code configuration automatically:
+**⚠️ IMPORTANT**: This guide uses **PROJECT-LEVEL** configuration. Claude Code must be started from the project directory.
 
-**Option 1: Automated setup (recommended)**
+Add the Datadog MCP server to your project configuration:
+
+**Automated Setup (RECOMMENDED)**:
 
 ```bash
 cd ~/mcp-server-datadog
-bash scripts/setup-claude-mcp.sh
+bash scripts/setup-project-mcp.sh
 ```
 
 This intelligent script will:
 
 - 🔍 **Auto-detect** if MCP server is built
-- 🛠️ **Offer to build** if not found (includes `pnpm install`)
+- 🛠️ **Auto-install** dependencies and build if needed
 - 🔑 **Detect Datadog credentials** and show status
-- 📝 **Create or update** `~/.claude/settings.json`
-- 🎯 **Add Datadog MCP server** configuration
+- 📝 **Create** `.mcp.json` in project root
+- 📁 **Create** `.claude/settings.local.json` with project settings
 - ✨ **Configure GLM 4.7 Flash** model mappings (haiku, sonnet, opus)
 - 💾 **Preserve existing settings** (with backup)
 - ✅ **Validate configuration** (JSON syntax check)
@@ -261,88 +299,28 @@ This intelligent script will:
   App Key: 5835119dd2***
   Site: datadoghq.com
 
-✓ Updated settings.json with Datadog MCP server
-✓ Updated model mappings for GLM 4.7 Flash
+✓ Created .mcp.json
+✓ Created .claude/settings.local.json
 
 ✅ Configuration file is valid JSON
 ```
 
-**Option 2: Manual setup with jq**
+**Files Created:**
 
-If you prefer manual setup or need to customize:
+- `.mcp.json` - MCP server configuration
+- `.claude/settings.local.json` - Project settings with GLM 4.7 Flash mappings
 
-```bash
-# Install jq if not available
-sudo apt-get install -y jq  # Ubuntu/Debian
-# or: brew install jq  # macOS
-
-# Get the MCP server path
-MCP_PATH="$HOME/mcp-server-datadog/build/index.js"
-
-# Create or update settings.json
-mkdir -p ~/.claude
-if [ -f ~/.claude/settings.json ]; then
-  # Update existing file
-  jq '.mcpServers.datadog = {
-    "command": "node",
-    "args": ["'$MCP_PATH'"],
-    "env": {
-      "DATADOG_API_KEY": "${DATADOG_API_KEY}",
-      "DATADOG_APP_KEY": "${DATADOG_APP_KEY}",
-      "DATADOG_SITE": "${DATADOG_SITE}"
-    }
-  } | .env.ANTHROPIC_DEFAULT_HAIKU_MODEL = "glm-4.7-flash" |
-      .env.ANTHROPIC_DEFAULT_SONNET_MODEL = "glm-4.7-flash" |
-      .env.ANTHROPIC_DEFAULT_OPUS_MODEL = "glm-4.7-flash"' \
-    ~/.claude/settings.json > ~/.claude/settings.json.tmp
-  mv ~/.claude/settings.json.tmp ~/.claude/settings.json
-else
-  # Create new file
-  cat > ~/.claude/settings.json <<EOF
-{
-  "env": {
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7-flash",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7-flash",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-4.7-flash"
-  },
-  "mcpServers": {
-    "datadog": {
-      "command": "node",
-      "args": ["$MCP_PATH"],
-      "env": {
-        "DATADOG_API_KEY": "\${DATADOG_API_KEY}",
-        "DATADOG_APP_KEY": "\${DATADOG_APP_KEY}",
-        "DATADOG_SITE": "\${DATADOG_SITE}"
-      }
-    }
-  }
-}
-EOF
-fi
-```
-
-**Option 3: Project-level configuration (for this repository)**
-
-If you're working within this repository and want project-specific MCP configuration:
-
-**Automated (recommended for project-level):**
+**Manual Setup (Advanced)**:
 
 ```bash
 cd ~/mcp-server-datadog
-bash scripts/setup-project-mcp.sh
-```
 
-**Manual setup:**
-
-```bash
-# Create .mcp.json in your project directory
-cd ~/mcp-server-datadog
-
+# Create .mcp.json
 cat > .mcp.json <<EOF
 {
   "mcpServers": {
     "datadog-local-mcp": {
-      "command": "$(pwd)/run-with-node20.sh",
+      "command": "$(pwd)/scripts/run-with-node20.sh",
       "env": {
         "DATADOG_API_KEY": "\${DATADOG_API_KEY}",
         "DATADOG_APP_KEY": "\${DATADOG_APP_KEY}",
@@ -370,32 +348,42 @@ EOF
 echo "✅ Project-level MCP configuration created"
 ```
 
-**Configuration Levels Explained**:
+**Configuration Type: PROJECT LEVEL** 🎯
 
-- **Global**: `~/.claude/settings.json` - Applies to all projects (Options 1 & 2)
-- **Project**: `.mcp.json` + `.claude/settings.local.json` - Applies only to this project (Option 3)
-- Project-level settings override global settings when working in that directory
-- For detailed comparison, see [MCP_CONFIGURATION.md](./MCP_CONFIGURATION.md)
+This guide uses **project-level** configuration (recommended):
 
-**Notes**:
+- ✅ **Isolated**: Configuration only applies to this project
+- ✅ **Version-controlled**: `.mcp.json` can be committed to git
+- ✅ **No conflicts**: Won't affect other projects
+- ⚠️ **Must run from project directory**: `cd ~/mcp-server-datadog && claude`
 
-- ✅ **Option 1 script features**:
-  - Auto-installs dependencies (`pnpm install`) if `node_modules` missing
-  - Auto-builds server if `build/` doesn't exist
-  - Detects and displays existing Datadog credentials
-  - Adds GLM 4.7 Flash model mappings automatically
-- 📂 For **global config**: use Option 1 (affects all projects)
-- 📁 For **project-level**: use Option 3 (only this project)
+For global configuration (all projects), see [MCP_CONFIGURATION.md](./MCP_CONFIGURATION.md)
+
+**Script Features**:
+
+- ✅ Auto-installs dependencies (`pnpm install`) if `node_modules` missing
+- ✅ Auto-builds server if `build/` doesn't exist
+- ✅ Detects and displays existing Datadog credentials
+- ✅ Creates `.mcp.json` and `.claude/settings.local.json`
+- ✅ Adds GLM 4.7 Flash model mappings automatically
+- ✅ Validates JSON configuration
+
+**Important**:
+
 - 🔑 MCP server inherits Datadog credentials from your shell environment
-- ⚠️ **Important**: Ensure Datadog environment variables (Step 3) are set before starting Claude Code
+- 📂 Always start Claude Code from the project directory
+- ⚠️ Ensure Datadog environment variables (Step 3) are set before starting
 
 ---
 
 ## Step 6: Verify Setup
 
-Test that everything is working:
+**⚠️ CRITICAL**: Start Claude Code from the project directory for project-level config:
 
 ```bash
+# Navigate to project directory
+cd ~/mcp-server-datadog
+
 # Start Claude Code
 claude
 
@@ -403,12 +391,20 @@ claude
 # "List all available MCP tools"
 ```
 
-You should see 32 Datadog tools available, including:
+**Expected Result**: You should see 32 Datadog tools available:
 
 - `mcp__datadog-local-mcp__get_monitors`
 - `mcp__datadog-local-mcp__get_service_stats_realtime`
 - `mcp__datadog-local-mcp__create_notebook`
-- And many more...
+- `mcp__datadog-local-mcp__list_slos`
+- `mcp__datadog-local-mcp__get_service_endpoints`
+- And 27 more tools...
+
+**Troubleshooting**:
+
+- If tools don't appear, check you're in the project directory: `pwd`
+- Verify config files exist: `ls -la .mcp.json .claude/settings.local.json`
+- Check Claude Code logs: `tail -f ~/.claude/logs/mcp-*.log`
 
 ---
 

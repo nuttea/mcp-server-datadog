@@ -331,6 +331,27 @@ MCP server for the Datadog API with 32 tools for comprehensive observability, SL
 
 ## Setup
 
+### Quick Start for Claude Code + Z.AI (Free GLM 4.7 Flash)
+
+**📖 See detailed guide**: [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
+**One-liner setup** (complete end-to-end):
+
+```bash
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+cd ~/mcp-server-datadog
+bash scripts/complete-setup.sh
+```
+
+This installs: NVM, Node 20, pnpm, dependencies, builds, and configures Claude Code (project-level).
+
+**Quick setup** (Node/pnpm already installed):
+
+```bash
+cd ~/mcp-server-datadog
+bash scripts/quickstart-setup.sh
+```
+
 ### Datadog Credentials
 
 You need valid Datadog API credentials to use this MCP server:
