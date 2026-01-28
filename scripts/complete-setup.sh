@@ -11,6 +11,9 @@ echo "3. pnpm package manager"
 echo "4. Datadog credentials"
 echo "5. MCP server dependencies and build"
 echo "6. Claude Code project-level configuration"
+echo "7. Z.AI API token (for GLM 4.7 Flash model)"
+echo ""
+echo "⏱️  Estimated time: 5-10 minutes"
 echo ""
 read -p "Continue? (Y/n): " CONTINUE
 if [[ "$CONTINUE" =~ ^[Nn]$ ]]; then
@@ -149,6 +152,62 @@ fi
 
 echo ""
 echo "========================================="
+echo "Step 7: Setting up Z.AI API Token"
+echo "========================================="
+echo ""
+echo "Z.AI provides FREE access to GLM 4.7 Flash model for Claude Code."
+echo ""
+echo "To get your API token:"
+echo "1. Open: https://z.ai/manage-apikey/apikey-list"
+echo "2. Create or copy your API key"
+echo ""
+read -p "Set up Z.AI now? (Y/n): " SETUP_ZAI
+
+if [[ ! "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
+  echo ""
+  echo "Opening Z.AI API key page in your browser..."
+
+  # Try to open browser
+  if command -v xdg-open &> /dev/null; then
+    xdg-open "https://z.ai/manage-apikey/apikey-list" 2>/dev/null &
+  elif command -v open &> /dev/null; then
+    open "https://z.ai/manage-apikey/apikey-list" 2>/dev/null &
+  else
+    echo "Please manually open: https://z.ai/manage-apikey/apikey-list"
+  fi
+
+  echo ""
+  echo "After getting your API key, the setup script will configure it..."
+  echo "Press Enter to continue..."
+  read
+
+  echo ""
+  echo "Downloading and running Z.AI setup script..."
+  curl -O "https://cdn.bigmodel.cn/install/claude_code_zai_env.sh"
+
+  if [ -f "claude_code_zai_env.sh" ]; then
+    bash ./claude_code_zai_env.sh
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Z.AI configured successfully"
+      rm -f claude_code_zai_env.sh
+    else
+      echo "⚠️  Z.AI setup had issues. You can run it manually later:"
+      echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
+    fi
+  else
+    echo "❌ Failed to download Z.AI setup script"
+    echo "You can set it up manually later with:"
+    echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
+  fi
+else
+  echo ""
+  echo "Skipping Z.AI setup. You can set it up later with:"
+  echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
+fi
+
+echo ""
+echo "========================================="
 echo "Setup Complete! 🎉"
 echo "========================================="
 echo ""
@@ -157,6 +216,9 @@ echo "✅ pnpm package manager installed"
 echo "✅ Datadog credentials configured"
 echo "✅ MCP server built"
 echo "✅ Claude Code configured (project-level)"
+if [[ ! "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
+  echo "✅ Z.AI API token configured (GLM 4.7 Flash)"
+fi
 echo ""
 echo "========================================="
 echo "Next Steps"
@@ -165,18 +227,30 @@ echo ""
 echo "1. Install Claude Code CLI (if not installed):"
 echo "   npm install -g @anthropic/claude-code"
 echo ""
-echo "2. Set up Z.AI API token:"
-echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
-echo ""
-echo "3. Start Claude Code from THIS project directory:"
+if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
+  echo "2. Set up Z.AI API token (you skipped this):"
+  echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
+  echo ""
+  echo "3. Start Claude Code from THIS project directory:"
+else
+  echo "2. Start Claude Code from THIS project directory:"
+fi
 echo "   cd $PROJECT_DIR"
 echo "   claude"
 echo ""
-echo "4. Test the setup:"
+if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
+  echo "4. Test the setup:"
+else
+  echo "3. Test the setup:"
+fi
 echo "   Type: 'List all available MCP tools'"
 echo "   You should see 32 Datadog tools!"
 echo ""
-echo "5. Try example prompts from docs/QUICKSTART.md"
+if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
+  echo "5. Try example prompts from docs/QUICKSTART.md"
+else
+  echo "4. Try example prompts from docs/QUICKSTART.md"
+fi
 echo ""
 echo "========================================="
 echo "Configuration Summary"

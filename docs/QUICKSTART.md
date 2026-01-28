@@ -20,44 +20,61 @@ This guide shows you how to set up and use the Datadog MCP Server with Claude Co
 
 ### Option 1: Complete End-to-End Setup (RECOMMENDED)
 
-**Installs everything** (NVM, Node 20, pnpm, dependencies, builds, configures):
+**Installs EVERYTHING** (NVM, Node 20, pnpm, dependencies, builds, configures, Z.AI):
 
 ```bash
-cd ~/mcp-server-datadog && bash scripts/complete-setup.sh
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+cd ~/mcp-server-datadog
+bash scripts/complete-setup.sh
 ```
 
-✨ **Perfect for first-time setup!** Installs all prerequisites automatically.
+✨ **Perfect for first-time setup!** Includes:
+
+- All prerequisites (NVM, Node, pnpm)
+- Z.AI API token setup (opens browser for you)
+- Project-level configuration
 
 ### Option 2: Quick Setup (Node/pnpm already installed)
 
 ```bash
-cd ~/mcp-server-datadog && bash scripts/quickstart-setup.sh
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+cd ~/mcp-server-datadog
+bash scripts/quickstart-setup.sh
 ```
 
 📋 **Requires**: Node.js 20+ and pnpm already installed.
+🎯 **Includes**: Z.AI API token setup (interactive)
 
 ### Individual Setup Commands
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog && cd ~/mcp-server-datadog
+git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
+cd ~/mcp-server-datadog
 
-# 2. Complete end-to-end setup (recommended)
+# 2. OPTION A: Complete setup (INCLUDES Z.AI - recommended)
 bash scripts/complete-setup.sh
 
-# OR step-by-step:
-# 2a. Set up Datadog credentials
-bash scripts/setup-datadog-env.sh
+# 2. OPTION B: Quick setup (INCLUDES Z.AI - if Node/pnpm installed)
+bash scripts/quickstart-setup.sh
 
-# 2b. Configure Claude Code (project-level)
-bash scripts/setup-project-mcp.sh
+# 2. OPTION C: Manual step-by-step:
+bash scripts/setup-datadog-env.sh          # Datadog credentials
+pnpm install && pnpm build                  # Build project
+bash scripts/setup-project-mcp.sh          # Claude Code config
 
-# 3. Set up Z.AI token
+# Get Z.AI API key: https://z.ai/manage-apikey/apikey-list
 curl -O "https://cdn.bigmodel.cn/install/claude_code_zai_env.sh" && bash ./claude_code_zai_env.sh
 
+# 3. Install Claude Code CLI (if not installed)
+npm install -g @anthropic/claude-code
+
 # 4. Start Claude Code from project directory
+cd ~/mcp-server-datadog
 claude
 ```
+
+**Note**: Options A and B now include Z.AI setup automatically!
 
 ### Verify Setup
 
@@ -79,7 +96,7 @@ claude  # Type: "List all available MCP tools"
 
 ### 🎯 Complete End-to-End Setup (RECOMMENDED)
 
-**For first-time users - installs everything:**
+**For first-time users - ONE SCRIPT installs EVERYTHING:**
 
 ```bash
 git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
@@ -87,27 +104,40 @@ cd ~/mcp-server-datadog
 bash scripts/complete-setup.sh
 ```
 
-This comprehensive script installs and configures:
+This comprehensive script installs and configures **all 7 steps**:
 
-- ✅ **NVM** (Node Version Manager)
-- ✅ **Node.js 20**
-- ✅ **pnpm** package manager
-- ✅ **Datadog credentials** (interactive setup with detection)
-- ✅ **Dependencies** (pnpm install)
-- ✅ **MCP server build**
-- ✅ **Claude Code** (project-level configuration)
-- ✅ **GLM 4.7 Flash** model mappings
+1. ✅ **NVM** (Node Version Manager)
+2. ✅ **Node.js 20**
+3. ✅ **pnpm** package manager
+4. ✅ **Datadog credentials** (interactive setup with detection)
+5. ✅ **Dependencies** (pnpm install)
+6. ✅ **MCP server build**
+7. ✅ **Claude Code** (project-level configuration)
+8. ✅ **Z.AI API token** (interactive setup)
+9. ✅ **GLM 4.7 Flash** model mappings
+
+**What the script does for Z.AI:**
+
+- 🌐 Opens https://z.ai/manage-apikey/apikey-list in your browser
+- ⏸️ Waits for you to copy your API key
+- 📥 Automatically downloads Z.AI setup script
+- ⚙️ Runs setup and configures GLM 4.7 Flash model
 
 **Configuration type: PROJECT LEVEL**
 
 - Creates `.mcp.json` in project root
 - Creates `.claude/settings.local.json` in project
-- Claude Code must be run from project directory
+- ⚠️ **Claude Code must be run from project directory**
 
-Then:
+**After setup completes:**
 
-1. Set up Z.AI API token (see instructions in script output)
-2. Start Claude Code from project directory: `claude`
+```bash
+cd ~/mcp-server-datadog
+claude  # Start Claude Code
+# Type: "List all available MCP tools"
+```
+
+⏱️ **Total time: 5-10 minutes** (mostly waiting for downloads and reading prompts)
 
 **For detailed step-by-step instructions, continue below.**
 
