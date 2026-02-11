@@ -79,9 +79,12 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Load credentials from .env file
+# Load and export credentials from .env file
 if [ -f "$PROJECT_DIR/.env" ]; then
   export $(grep -v '^#' "$PROJECT_DIR/.env" | xargs)
+  echo "✅ Environment variables loaded and exported from .env"
+else
+  echo "⚠️  Warning: .env file not found. Credentials may not be available."
 fi
 
 echo ""
@@ -275,6 +278,7 @@ if [ -n "$DATADOG_API_KEY" ] && [ -n "$DATADOG_APP_KEY" ]; then
   echo "  API Key: ${DATADOG_API_KEY:0:10}***"
   echo "  App Key: ${DATADOG_APP_KEY:0:10}***"
   echo "  Site: ${DATADOG_SITE:-datadoghq.com}"
+  echo "  Status: ✅ Exported and available in current session"
 fi
 echo ""
 echo "Happy monitoring! 🚀📊"

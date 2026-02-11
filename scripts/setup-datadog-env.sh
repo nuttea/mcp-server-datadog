@@ -15,8 +15,11 @@ if [ -f "$ENV_FILE" ]; then
   if grep -q "^DATADOG_API_KEY=" "$ENV_FILE" && grep -q "^DATADOG_APP_KEY=" "$ENV_FILE"; then
     echo "✅ Found existing credentials in $ENV_FILE"
 
-    # Load and display existing credentials
+    # Load and export existing credentials
     source "$ENV_FILE"
+    export DATADOG_API_KEY
+    export DATADOG_APP_KEY
+    export DATADOG_SITE
     echo "   API Key: ${DATADOG_API_KEY:0:10}***"
     echo "   App Key: ${DATADOG_APP_KEY:0:10}***"
     echo "   Site: ${DATADOG_SITE:-datadoghq.com}"
@@ -53,6 +56,7 @@ if [ -f "$ENV_FILE" ]; then
       echo ""
       echo "💡 Credentials are stored in: $ENV_FILE"
       echo "   (This file is git-ignored for security)"
+      echo "✅ Environment variables exported for current session"
       exit 0
     fi
 
@@ -108,8 +112,14 @@ echo "DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$ENV_FILE"
 echo "DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$ENV_FILE"
 echo "DATADOG_SITE=\"$DD_SITE\"" >> "$ENV_FILE"
 
+# Export environment variables for current session
+export DATADOG_API_KEY="$DD_API_KEY"
+export DATADOG_APP_KEY="$DD_APP_KEY"
+export DATADOG_SITE="$DD_SITE"
+
 echo ""
 echo "✅ Credentials saved to $ENV_FILE"
+echo "✅ Environment variables exported for current session"
 echo ""
 echo "💡 The .env file is automatically loaded by:"
 echo "   - Node.js scripts (using dotenv)"

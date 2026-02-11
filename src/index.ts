@@ -7,6 +7,10 @@
  * With a design built for scalability, future integrations with additional Datadog APIs are anticipated.
  */
 
+// Load environment variables from .env file
+import dotenv from 'dotenv'
+dotenv.config()
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
