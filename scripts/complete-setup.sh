@@ -5,7 +5,7 @@ echo "Datadog MCP Server - Complete Setup"
 echo "========================================="
 echo ""
 echo "This script will install and configure:"
-echo "1. Node.js 20"
+echo "1. NVM (Node Version Manager) and Node.js 20"
 echo "2. pnpm package manager"
 echo "3. Datadog credentials (.env file)"
 echo "4. MCP server dependencies and build"
@@ -26,28 +26,37 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo ""
 echo "========================================="
-echo "Step 1: Installing Node.js 20"
+echo "Step 1: Installing NVM and Node.js 20"
 echo "========================================="
 echo ""
 
-# Check if Node 20 is already installed
-if command -v node &> /dev/null && node --version | grep -q "^v20"; then
-  echo "✓ Node.js 20 already installed ($(node --version))"
+# Check if NVM is installed
+if [ ! -d "$HOME/.nvm" ]; then
+  echo "Installing NVM..."
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+  # Load NVM
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+  echo "✅ NVM installed"
 else
+  echo "✓ NVM already installed"
+
+  # Load NVM
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+fi
+
+# Check if Node 20 is installed
+if ! command -v node &> /dev/null || ! node --version | grep -q "^v20"; then
   echo "Installing Node.js 20..."
-
-  # Add NodeSource repository
-  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-
-  # Install Node.js
-  sudo apt install -y nodejs
-
-  if [ $? -eq 0 ]; then
-    echo "✅ Node.js 20 installed ($(node --version))"
-  else
-    echo "❌ Node.js installation failed"
-    exit 1
-  fi
+  nvm install 20
+  nvm use 20
+  nvm alias default 20
+  echo "✅ Node.js 20 installed ($(node --version))"
+else
+  echo "✓ Node.js 20 already installed ($(node --version))"
 fi
 
 echo ""
@@ -225,7 +234,7 @@ echo "========================================="
 echo "Setup Complete! 🎉"
 echo "========================================="
 echo ""
-echo "✅ Node.js 20 installed"
+echo "✅ NVM and Node.js 20 installed"
 echo "✅ pnpm package manager installed"
 echo "✅ Datadog credentials configured (.env file)"
 echo "✅ MCP server built"
