@@ -338,7 +338,6 @@ MCP server for the Datadog API with 32 tools for comprehensive observability, SL
 **One-liner setup** (complete end-to-end with Z.AI):
 
 ```bash
-bash
 git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
 cd ~/mcp-server-datadog
 bash scripts/complete-setup.sh
@@ -346,17 +345,13 @@ bash scripts/complete-setup.sh
 
 This installs: NVM, Node 20, pnpm, dependencies, builds, configures Claude Code (project-level), and **sets up Z.AI API token interactively**.
 
-**Quick setup** (Node/pnpm already installed, includes Z.AI):
-
-```bash
-cd ~/mcp-server-datadog
-bash scripts/quickstart-setup.sh
-```
-
 **After setup:**
 
 ```bash
 cd ~/mcp-server-datadog  # Must run from project directory
+source .env
+echo $DATADOG_API_KEY # Check api key
+
 claude  # Start Claude Code with Datadog MCP tools
 ```
 
