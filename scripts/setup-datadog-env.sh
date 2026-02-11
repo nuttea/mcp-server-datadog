@@ -98,19 +98,29 @@ if [ -f "$ENV_FILE" ]; then
   echo "📦 Backed up existing .env file"
 
   # Remove old Datadog credentials from .env
+  sed -i.bak '/^export DATADOG_API_KEY=/d' "$ENV_FILE"
+  sed -i.bak '/^export DATADOG_APP_KEY=/d' "$ENV_FILE"
+  sed -i.bak '/^export DATADOG_SITE=/d' "$ENV_FILE"
+  sed -i.bak '/^export DATADOG_MAX_RETRIES=/d' "$ENV_FILE"
+  sed -i.bak '/^export DATADOG_RETRY_DELAY_MS=/d' "$ENV_FILE"
   sed -i.bak '/^DATADOG_API_KEY=/d' "$ENV_FILE"
   sed -i.bak '/^DATADOG_APP_KEY=/d' "$ENV_FILE"
   sed -i.bak '/^DATADOG_SITE=/d' "$ENV_FILE"
   sed -i.bak '/^# Datadog MCP Server Credentials/d' "$ENV_FILE"
+  sed -i.bak '/^# Optional: Retry configuration/d' "$ENV_FILE"
   rm -f "$ENV_FILE.bak"
 fi
 
 # Create or update .env file
 echo "" >> "$ENV_FILE"
 echo "# Datadog MCP Server Credentials (added $(date))" >> "$ENV_FILE"
-echo "DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$ENV_FILE"
-echo "DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$ENV_FILE"
-echo "DATADOG_SITE=\"$DD_SITE\"" >> "$ENV_FILE"
+echo "export DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$ENV_FILE"
+echo "export DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$ENV_FILE"
+echo "export DATADOG_SITE=\"$DD_SITE\"" >> "$ENV_FILE"
+echo "" >> "$ENV_FILE"
+echo "# Optional: Retry configuration (defaults shown)" >> "$ENV_FILE"
+echo "export DATADOG_MAX_RETRIES=2" >> "$ENV_FILE"
+echo "export DATADOG_RETRY_DELAY_MS=2000" >> "$ENV_FILE"
 
 # Export environment variables for current session
 export DATADOG_API_KEY="$DD_API_KEY"

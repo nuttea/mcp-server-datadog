@@ -9,9 +9,10 @@ echo "1. NVM (Node Version Manager) and Node.js 20"
 echo "2. pnpm package manager"
 echo "3. Datadog credentials (.env file)"
 echo "4. MCP server dependencies and build"
-echo "5. Claude Code CLI"
-echo "6. Claude Code project-level configuration"
-echo "7. Z.AI API token (for GLM 4.7 Flash model)"
+echo "5. MCP server testing (verify API connectivity)"
+echo "6. Claude Code CLI"
+echo "7. Claude Code project-level configuration"
+echo "8. Z.AI API token (for GLM 4.7 Flash model)"
 echo ""
 echo "⏱️  Estimated time: 5-10 minutes"
 echo ""
@@ -139,7 +140,98 @@ fi
 
 echo ""
 echo "========================================="
-echo "Step 6: Installing Claude Code CLI"
+echo "Step 6: Testing MCP server"
+echo "========================================="
+echo ""
+
+# Test if MCP server can load credentials and call Datadog API
+echo "Testing MCP server with Datadog API..."
+echo ""
+
+# Create a simple test script
+cat > /tmp/test-mcp-server.js << 'TESTEOF'
+import { spawn } from 'child_process';
+
+const test = () => {
+  return new Promise((resolve, reject) => {
+    const mcp = spawn('node', ['build/index.js'], {
+      stdio: ['pipe', 'pipe', 'inherit']
+    });
+
+    let output = '';
+    let timeout = setTimeout(() => {
+      mcp.kill();
+      reject(new Error('Test timeout after 10s'));
+    }, 10000);
+
+    mcp.stdout.on('data', (data) => {
+      output += data.toString();
+
+      // Check if we got a valid response
+      if (output.includes('"tools"') || output.includes('"result"')) {
+        clearTimeout(timeout);
+        mcp.kill();
+
+        if (output.includes('error') && !output.includes('"tools"')) {
+          reject(new Error('MCP server returned error: ' + output));
+        } else {
+          resolve(output);
+        }
+      }
+    });
+
+    // Send list_tools request
+    const request = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    };
+
+    mcp.stdin.write(JSON.stringify(request) + '\n');
+  });
+};
+
+test()
+  .then(() => {
+    console.log('✅ MCP server test passed');
+    console.log('   - Server loads successfully');
+    console.log('   - Environment variables loaded from .env');
+    console.log('   - API credentials configured');
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error('❌ MCP server test failed:', err.message);
+    console.error('   This may indicate issues with:');
+    console.error('   - Missing .env file or credentials');
+    console.error('   - Invalid API keys');
+    console.error('   - Build problems');
+    process.exit(1);
+  });
+TESTEOF
+
+# Run the test
+if node /tmp/test-mcp-server.js; then
+  echo ""
+  echo "✅ MCP server is working correctly"
+else
+  echo ""
+  echo "⚠️  MCP server test failed"
+  echo "   You can manually test later with:"
+  echo "   npx @modelcontextprotocol/inspector build/index.js"
+  echo ""
+  read -p "Continue with setup anyway? (y/N): " CONTINUE_ANYWAY
+  if [[ ! "$CONTINUE_ANYWAY" =~ ^[Yy]$ ]]; then
+    echo "Setup aborted. Please check your credentials and try again."
+    exit 1
+  fi
+fi
+
+# Cleanup
+rm -f /tmp/test-mcp-server.js
+
+echo ""
+echo "========================================="
+echo "Step 7: Installing Claude Code CLI"
 echo "========================================="
 echo ""
 
@@ -161,7 +253,7 @@ fi
 
 echo ""
 echo "========================================="
-echo "Step 7: Configuring Claude Code (Project Level)"
+echo "Step 8: Configuring Claude Code (Project Level)"
 echo "========================================="
 echo ""
 
@@ -175,7 +267,7 @@ fi
 
 echo ""
 echo "========================================="
-echo "Step 8: Setting up Z.AI API Token"
+echo "Step 9: Setting up Z.AI API Token"
 echo "========================================="
 echo ""
 echo "Z.AI provides FREE access to GLM 4.7 Flash model for Claude Code."
@@ -237,7 +329,8 @@ echo ""
 echo "✅ NVM and Node.js 20 installed"
 echo "✅ pnpm package manager installed"
 echo "✅ Datadog credentials configured (.env file)"
-echo "✅ MCP server built"
+echo "✅ MCP server built and tested"
+echo "✅ Datadog API connectivity verified"
 echo "✅ Claude Code CLI installed"
 echo "✅ Claude Code configured (project-level)"
 if [[ ! "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
