@@ -341,8 +341,15 @@ export const createNotebooksToolHandlers = (
  * Splits by headers and creates markdown cells
  */
 function convertMarkdownToCells(
-  content: string,
+  content: string | undefined,
 ): v1.NotebookCellCreateRequest[] {
+  // Handle undefined or empty content
+  if (!content || typeof content !== 'string') {
+    throw new Error(
+      'Content is required and must be a string. Received: ' + typeof content,
+    )
+  }
+
   const cells: v1.NotebookCellCreateRequest[] = []
 
   // Split content by top-level headers (# Header)
