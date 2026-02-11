@@ -338,6 +338,7 @@ MCP server for the Datadog API with 32 tools for comprehensive observability, SL
 **One-liner setup** (complete end-to-end with Z.AI):
 
 ```bash
+bash
 git clone https://github.com/nuttea/mcp-server-datadog ~/mcp-server-datadog
 cd ~/mcp-server-datadog
 bash scripts/complete-setup.sh

@@ -34,6 +34,6 @@ See [testing/](testing/) for comprehensive testing guides:
 
 ## Session Notes
 
-- [SESSION_SUMMARY.md](../SESSION_SUMMARY.md) - Development session notes
+- [SESSION_SUMMARY.md](./archive/SESSION_SUMMARY.md) - Development session notes (archived)
 - [OBSERVABILITY_ISSUES.md](../OBSERVABILITY_ISSUES.md) - Known observability issues
 - [query-usage-metrics.md](../query-usage-metrics.md) - Usage metrics queries

@@ -15,7 +15,7 @@
 
 ### Architecture & Development
 
-- **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** - Codebase organization
+- **[PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md)** - Codebase organization
 - **[src/tools/notebooks/README.md](../src/tools/notebooks/README.md)** - Notebook tools reference
 
 ---
@@ -172,7 +172,7 @@ Professional analysis workflows:
 | Define SLOs       | SLI/SLO guide                                         | `/datadog-sli-slo-analysis`  |
 | Reduce costs      | Usage attribution guide                               | `/datadog-usage-attribution` |
 | Generate reports  | [templates/README.md](../reports/templates/README.md) | Templates + skills           |
-| Add new tools     | [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)        | 3-file pattern               |
+| Add new tools     | [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md)       | 3-file pattern               |
 
 ---
 
@@ -188,8 +188,7 @@ datadog-mcp-server/
 ├── docs/                        # Documentation
 │   ├── DOCUMENTATION-INDEX.md   # This file
 │   ├── HEALTHCHECK_GUIDE.md     # Health check guide
-│   ├── NOTEBOOKS-GUIDE.md       # Notebooks how-to
-│   └── PROJECT_STRUCTURE.md     # Codebase structure
+│   └── NOTEBOOKS-GUIDE.md       # Notebooks how-to
 │
 ├── reports/
 │   └── templates/               # Reusable templates (tracked)

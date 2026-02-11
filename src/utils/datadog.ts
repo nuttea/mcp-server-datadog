@@ -20,17 +20,18 @@ export function createDatadogConfig(
     },
   })
 
-  if (config.site != null) {
-    datadogConfig.setServerVariables({
-      site: config.site,
-    })
+  // Set server variables in a single call to avoid overwriting
+  const serverVars: { site?: string; subdomain?: string } = {}
+
+  // Always set site with default fallback
+  serverVars.site = config.site || 'datadoghq.com'
+
+  // Add subdomain if provided
+  if (config.subdomain != null) {
+    serverVars.subdomain = config.subdomain
   }
 
-  if (config.subdomain != null) {
-    datadogConfig.setServerVariables({
-      subdomain: config.subdomain,
-    })
-  }
+  datadogConfig.setServerVariables(serverVars)
 
   datadogConfig.unstableOperations = {
     'v2.listIncidents': true,

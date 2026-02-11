@@ -5,36 +5,32 @@ echo "Datadog Credentials Setup"
 echo "==================================="
 echo ""
 
-# Check if credentials already exist in environment
-if [ -n "$DATADOG_API_KEY" ] && [ -n "$DATADOG_APP_KEY" ]; then
-  echo "✅ Found existing credentials in environment:"
-  echo "   API Key: ${DATADOG_API_KEY:0:10}***"
-  echo "   App Key: ${DATADOG_APP_KEY:0:10}***"
-  echo "   Site: ${DATADOG_SITE:-datadoghq.com}"
-  echo ""
-  read -p "Use existing credentials? (Y/n): " USE_EXISTING
+# Determine project directory (parent of scripts/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$PROJECT_DIR/.env"
 
-  if [[ ! "$USE_EXISTING" =~ ^[Nn]$ ]]; then
-    DD_API_KEY="$DATADOG_API_KEY"
-    DD_APP_KEY="$DATADOG_APP_KEY"
-    DD_SITE="${DATADOG_SITE:-datadoghq.com}"
-    echo "✅ Using existing credentials"
+# Check if .env file already exists with credentials
+if [ -f "$ENV_FILE" ]; then
+  if grep -q "^DATADOG_API_KEY=" "$ENV_FILE" && grep -q "^DATADOG_APP_KEY=" "$ENV_FILE"; then
+    echo "✅ Found existing credentials in $ENV_FILE"
+
+    # Load and display existing credentials
+    source "$ENV_FILE"
+    echo "   API Key: ${DATADOG_API_KEY:0:10}***"
+    echo "   App Key: ${DATADOG_APP_KEY:0:10}***"
+    echo "   Site: ${DATADOG_SITE:-datadoghq.com}"
     echo ""
+    read -p "Use existing credentials? (Y/n): " USE_EXISTING
 
-    # Skip to shell config detection
-    if [ -f "$HOME/.zshrc" ]; then
-      SHELL_CONFIG="$HOME/.zshrc"
-    elif [ -f "$HOME/.bashrc" ]; then
-      SHELL_CONFIG="$HOME/.bashrc"
-    else
-      SHELL_CONFIG="$HOME/.bashrc"
-      touch "$SHELL_CONFIG"
-    fi
-
-    # Check if already in shell config
-    if grep -q "export DATADOG_API_KEY=" "$SHELL_CONFIG"; then
-      echo "✅ Credentials already configured in $SHELL_CONFIG"
+    if [[ ! "$USE_EXISTING" =~ ^[Nn]$ ]]; then
+      DD_API_KEY="$DATADOG_API_KEY"
+      DD_APP_KEY="$DATADOG_APP_KEY"
+      DD_SITE="${DATADOG_SITE:-datadoghq.com}"
+      echo "✅ Using existing credentials"
       echo ""
+
+      # Offer to test credentials
       read -p "Test Datadog API connection? (y/N): " TEST_API
       if [[ "$TEST_API" =~ ^[Yy]$ ]]; then
         echo ""
@@ -54,12 +50,12 @@ if [ -n "$DATADOG_API_KEY" ] && [ -n "$DATADOG_APP_KEY" ]; then
       fi
       echo ""
       echo "Setup complete!"
+      echo ""
+      echo "💡 Credentials are stored in: $ENV_FILE"
+      echo "   (This file is git-ignored for security)"
       exit 0
     fi
 
-    # Continue to save to shell config
-    echo "Saving credentials to $SHELL_CONFIG..."
-  else
     echo "Entering new credentials..."
     echo ""
   fi
@@ -92,47 +88,46 @@ echo ""
 read -p "Enter your Datadog Site [datadoghq.com]: " DD_SITE
 DD_SITE=${DD_SITE:-datadoghq.com}
 
-# Detect shell config file
-if [ -f "$HOME/.zshrc" ]; then
-  SHELL_CONFIG="$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-  SHELL_CONFIG="$HOME/.bashrc"
-else
-  SHELL_CONFIG="$HOME/.bashrc"
-  touch "$SHELL_CONFIG"
+# Backup existing .env if it exists
+if [ -f "$ENV_FILE" ]; then
+  cp "$ENV_FILE" "$ENV_FILE.backup.$(date +%Y%m%d_%H%M%S)"
+  echo "📦 Backed up existing .env file"
+
+  # Remove old Datadog credentials from .env
+  sed -i.bak '/^DATADOG_API_KEY=/d' "$ENV_FILE"
+  sed -i.bak '/^DATADOG_APP_KEY=/d' "$ENV_FILE"
+  sed -i.bak '/^DATADOG_SITE=/d' "$ENV_FILE"
+  sed -i.bak '/^# Datadog MCP Server Credentials/d' "$ENV_FILE"
+  rm -f "$ENV_FILE.bak"
 fi
 
-# Check if credentials already exist in config
-if grep -q "export DATADOG_API_KEY=" "$SHELL_CONFIG"; then
-  echo ""
-  echo "⚠️  Datadog credentials already exist in $SHELL_CONFIG"
-  read -p "Overwrite existing credentials? (y/N): " OVERWRITE
-  if [[ ! "$OVERWRITE" =~ ^[Yy]$ ]]; then
-    echo "Aborted. No changes made."
-    exit 0
+# Create or update .env file
+echo "" >> "$ENV_FILE"
+echo "# Datadog MCP Server Credentials (added $(date))" >> "$ENV_FILE"
+echo "DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$ENV_FILE"
+echo "DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$ENV_FILE"
+echo "DATADOG_SITE=\"$DD_SITE\"" >> "$ENV_FILE"
+
+echo ""
+echo "✅ Credentials saved to $ENV_FILE"
+echo ""
+echo "💡 The .env file is automatically loaded by:"
+echo "   - Node.js scripts (using dotenv)"
+echo "   - Claude Code MCP server"
+echo "   - Integration tests"
+echo ""
+
+# Ensure .env is in .gitignore
+GITIGNORE_FILE="$PROJECT_DIR/.gitignore"
+if [ -f "$GITIGNORE_FILE" ]; then
+  if ! grep -q "^\.env$" "$GITIGNORE_FILE"; then
+    echo ".env" >> "$GITIGNORE_FILE"
+    echo "✅ Added .env to .gitignore"
   fi
-  # Remove old credentials
-  sed -i.bak '/# Datadog MCP Server Credentials/d' "$SHELL_CONFIG"
-  sed -i.bak '/export DATADOG_API_KEY=/d' "$SHELL_CONFIG"
-  sed -i.bak '/export DATADOG_APP_KEY=/d' "$SHELL_CONFIG"
-  sed -i.bak '/export DATADOG_SITE=/d' "$SHELL_CONFIG"
+else
+  echo ".env" > "$GITIGNORE_FILE"
+  echo "✅ Created .gitignore with .env entry"
 fi
-
-# Add credentials to shell config
-echo "" >> "$SHELL_CONFIG"
-echo "# Datadog MCP Server Credentials (added $(date))" >> "$SHELL_CONFIG"
-echo "export DATADOG_API_KEY=\"$DD_API_KEY\"" >> "$SHELL_CONFIG"
-echo "export DATADOG_APP_KEY=\"$DD_APP_KEY\"" >> "$SHELL_CONFIG"
-echo "export DATADOG_SITE=\"$DD_SITE\"" >> "$SHELL_CONFIG"
-
-echo ""
-echo "✅ Credentials saved to $SHELL_CONFIG"
-echo ""
-echo "To activate in current session, run:"
-echo "  source $SHELL_CONFIG"
-echo ""
-echo "Or start a new terminal session."
-echo ""
 
 # Offer to test credentials
 read -p "Test Datadog API connection now? (y/N): " TEST_API
@@ -159,3 +154,5 @@ fi
 
 echo ""
 echo "Setup complete!"
+echo ""
+echo "🔒 Security note: Never commit the .env file to git!"

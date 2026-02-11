@@ -5,11 +5,11 @@ echo "Datadog MCP Server - Complete Setup"
 echo "========================================="
 echo ""
 echo "This script will install and configure:"
-echo "1. NVM (Node Version Manager)"
-echo "2. Node.js 20"
-echo "3. pnpm package manager"
-echo "4. Datadog credentials"
-echo "5. MCP server dependencies and build"
+echo "1. Node.js 20"
+echo "2. pnpm package manager"
+echo "3. Datadog credentials (.env file)"
+echo "4. MCP server dependencies and build"
+echo "5. Claude Code CLI"
 echo "6. Claude Code project-level configuration"
 echo "7. Z.AI API token (for GLM 4.7 Flash model)"
 echo ""
@@ -26,37 +26,28 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo ""
 echo "========================================="
-echo "Step 1: Installing NVM and Node.js 20"
+echo "Step 1: Installing Node.js 20"
 echo "========================================="
 echo ""
 
-# Check if NVM is installed
-if [ ! -d "$HOME/.nvm" ]; then
-  echo "Installing NVM..."
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-
-  # Load NVM
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-  echo "✅ NVM installed"
-else
-  echo "✓ NVM already installed"
-
-  # Load NVM
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-fi
-
-# Check if Node 20 is installed
-if ! command -v node &> /dev/null || ! node --version | grep -q "^v20"; then
-  echo "Installing Node.js 20..."
-  nvm install 20
-  nvm use 20
-  nvm alias default 20
-  echo "✅ Node.js 20 installed"
-else
+# Check if Node 20 is already installed
+if command -v node &> /dev/null && node --version | grep -q "^v20"; then
   echo "✓ Node.js 20 already installed ($(node --version))"
+else
+  echo "Installing Node.js 20..."
+
+  # Add NodeSource repository
+  curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+  # Install Node.js
+  sudo apt install -y nodejs
+
+  if [ $? -eq 0 ]; then
+    echo "✅ Node.js 20 installed ($(node --version))"
+  else
+    echo "❌ Node.js installation failed"
+    exit 1
+  fi
 fi
 
 echo ""
@@ -80,7 +71,7 @@ echo "Step 3: Setting up Datadog credentials"
 echo "========================================="
 echo ""
 
-# Run Datadog credentials setup
+# Run Datadog credentials setup (now creates .env file)
 bash "$SCRIPT_DIR/setup-datadog-env.sh"
 
 if [ $? -ne 0 ]; then
@@ -88,11 +79,9 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Source the shell config to load credentials
-if [ -f "$HOME/.zshrc" ]; then
-  source "$HOME/.zshrc"
-elif [ -f "$HOME/.bashrc" ]; then
-  source "$HOME/.bashrc"
+# Load credentials from .env file
+if [ -f "$PROJECT_DIR/.env" ]; then
+  export $(grep -v '^#' "$PROJECT_DIR/.env" | xargs)
 fi
 
 echo ""
@@ -138,7 +127,29 @@ fi
 
 echo ""
 echo "========================================="
-echo "Step 6: Configuring Claude Code (Project Level)"
+echo "Step 6: Installing Claude Code CLI"
+echo "========================================="
+echo ""
+
+# Check if Claude Code CLI is installed
+if command -v claude &> /dev/null; then
+  echo "✓ Claude Code CLI already installed ($(claude --version 2>/dev/null || echo 'version unknown'))"
+else
+  echo "Installing Claude Code CLI..."
+  npm install -g @anthropic-ai/claude-code
+
+  if [ $? -eq 0 ]; then
+    echo "✅ Claude Code CLI installed"
+  else
+    echo "❌ Claude Code CLI installation failed"
+    echo "   You can install it manually later with:"
+    echo "   npm install -g @anthropic-ai/claude-code"
+  fi
+fi
+
+echo ""
+echo "========================================="
+echo "Step 7: Configuring Claude Code (Project Level)"
 echo "========================================="
 echo ""
 
@@ -152,7 +163,7 @@ fi
 
 echo ""
 echo "========================================="
-echo "Step 7: Setting up Z.AI API Token"
+echo "Step 8: Setting up Z.AI API Token"
 echo "========================================="
 echo ""
 echo "Z.AI provides FREE access to GLM 4.7 Flash model for Claude Code."
@@ -211,10 +222,11 @@ echo "========================================="
 echo "Setup Complete! 🎉"
 echo "========================================="
 echo ""
-echo "✅ NVM and Node.js 20 installed"
+echo "✅ Node.js 20 installed"
 echo "✅ pnpm package manager installed"
-echo "✅ Datadog credentials configured"
+echo "✅ Datadog credentials configured (.env file)"
 echo "✅ MCP server built"
+echo "✅ Claude Code CLI installed"
 echo "✅ Claude Code configured (project-level)"
 if [[ ! "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
   echo "✅ Z.AI API token configured (GLM 4.7 Flash)"
@@ -224,32 +236,29 @@ echo "========================================="
 echo "Next Steps"
 echo "========================================="
 echo ""
-echo "1. Install Claude Code CLI (if not installed):"
-echo "   npm install -g @anthropic/claude-code"
-echo ""
 if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
-  echo "2. Set up Z.AI API token (you skipped this):"
+  echo "1. Set up Z.AI API token (you skipped this):"
   echo "   curl -O https://cdn.bigmodel.cn/install/claude_code_zai_env.sh && bash ./claude_code_zai_env.sh"
   echo ""
-  echo "3. Start Claude Code from THIS project directory:"
-else
   echo "2. Start Claude Code from THIS project directory:"
+else
+  echo "1. Start Claude Code from THIS project directory:"
 fi
 echo "   cd $PROJECT_DIR"
 echo "   claude"
 echo ""
 if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
-  echo "4. Test the setup:"
-else
   echo "3. Test the setup:"
+else
+  echo "2. Test the setup:"
 fi
 echo "   Type: 'List all available MCP tools'"
 echo "   You should see 32 Datadog tools!"
 echo ""
 if [[ "$SETUP_ZAI" =~ ^[Nn]$ ]]; then
-  echo "5. Try example prompts from docs/QUICKSTART.md"
-else
   echo "4. Try example prompts from docs/QUICKSTART.md"
+else
+  echo "3. Try example prompts from docs/QUICKSTART.md"
 fi
 echo ""
 echo "========================================="
@@ -257,12 +266,15 @@ echo "Configuration Summary"
 echo "========================================="
 echo "Project directory: $PROJECT_DIR"
 echo "Configuration files:"
+echo "  - .env (Datadog credentials - git-ignored)"
 echo "  - .mcp.json (MCP server config)"
 echo "  - .claude/settings.local.json (Project settings)"
 echo ""
-echo "Datadog credentials:"
-echo "  API Key: ${DATADOG_API_KEY:0:10}***"
-echo "  App Key: ${DATADOG_APP_KEY:0:10}***"
-echo "  Site: ${DATADOG_SITE:-datadoghq.com}"
+if [ -n "$DATADOG_API_KEY" ] && [ -n "$DATADOG_APP_KEY" ]; then
+  echo "Datadog credentials:"
+  echo "  API Key: ${DATADOG_API_KEY:0:10}***"
+  echo "  App Key: ${DATADOG_APP_KEY:0:10}***"
+  echo "  Site: ${DATADOG_SITE:-datadoghq.com}"
+fi
 echo ""
 echo "Happy monitoring! 🚀📊"

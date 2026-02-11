@@ -1,5 +1,7 @@
 # Datadog MCP Server - Quick Reference
 
+> **📌 Note**: This is the **quick reference** guide for Claude Code. For comprehensive context and detailed patterns, see [CLAUDE-FULL.md](CLAUDE-FULL.md).
+
 **32 Tools** | **4 Skills** | **12 Modules** | **Production Ready**
 
 ---
@@ -104,7 +106,7 @@ Red Flags:
 
 ✅ Production-ready | ✅ 184/185 tests | ✅ Enterprise-grade
 
-**Full docs**: See README.md, SECURITY.md, HEALTHCHECK_GUIDE.md
+**Full docs**: See README.md, SECURITY.md, docs/HEALTHCHECK_GUIDE.md
 
 ---
 
